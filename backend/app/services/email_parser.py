@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import platform
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -74,50 +73,23 @@ def _parse_msg(path: Path) -> EmailContent:
 
 
 def _parse_pst(path: Path) -> List[EmailContent]:
-    if platform.system() != "Windows":
-        return [
-            EmailContent(
-                source_path=str(path),
-                parser="pst",
-                error="PST parsing requires Windows and pywin32; convert to .msg on non-Windows",
-            )
-        ]
     try:
-        import win32com.client
-        import pythoncom
-    except Exception:  # pragma: no cover - optional dependency
+        import pypff  # type: ignore
+    except Exception:
         return [
             EmailContent(
                 source_path=str(path),
                 parser="pst",
-                error="missing dependency: install pywin32 to parse .pst files",
+                error="missing dependency: install pypff (libpff) to parse .pst files on Linux",
             )
         ]
 
-    # Basic traversal using Outlook COM; keep scope minimal
-    pythoncom.CoInitialize()
     messages: List[EmailContent] = []
     try:
-        outlook = win32com.client.Dispatch("Outlook.Application")
-        namespace = outlook.GetNamespace("MAPI")
-        namespace.AddStore(str(path))
-        stores = namespace.Stores
-        pst_store = None
-        for store in stores:
-            if store.FilePath == str(path):
-                pst_store = store
-                break
-        if not pst_store:
-            return [
-                EmailContent(
-                    source_path=str(path),
-                    parser="pst",
-                    error="unable to open PST store via Outlook",
-                )
-            ]
-        root_folder = pst_store.GetRootFolder()
-        _collect_pst_folder(root_folder, messages)
-        namespace.RemoveStore(root_folder)
+        pst = pypff.file()
+        pst.open(str(path))
+        root = pst.get_root_folder()
+        _collect_pst_folder(root, messages)
     except Exception as exc:  # pragma: no cover - defensive
         messages.append(
             EmailContent(
@@ -127,55 +99,66 @@ def _parse_pst(path: Path) -> List[EmailContent]:
             )
         )
     finally:
-        pythoncom.CoUninitialize()
+        try:
+            pst.close()  # type: ignore
+        except Exception:
+            pass
     return messages
 
 
 def _collect_pst_folder(folder, messages: List[EmailContent], folder_name: Optional[str] = None):
+    folder_name = folder_name or getattr(folder, "get_name", lambda: "Root")()
     try:
-        folder_name = folder_name or folder.Name
-        for item in folder.Items:
+        for i in range(folder.get_number_of_sub_messages()):
             try:
-                if getattr(item, "Class", None) == 43:  # olMail
-                    messages.append(_pst_item_to_content(item, folder_name))
+                item = folder.get_sub_message(i)
+                messages.append(_pst_item_to_content(item, folder_name))
             except Exception:
                 continue
-        for sub in folder.Folders:
-            _collect_pst_folder(sub, messages, sub.Name)
+        for i in range(folder.get_number_of_sub_folders()):
+            try:
+                sub = folder.get_sub_folder(i)
+                _collect_pst_folder(sub, messages, sub.get_name())
+            except Exception:
+                continue
     except Exception:
         return
 
 
 def _pst_item_to_content(item, folder_name: str) -> EmailContent:
-    content = EmailContent(source_path=folder_name, parser="pst")
-    content.subject = getattr(item, "Subject", "") or ""
-    sender_name = getattr(item, "SenderName", "") or ""
-    sender_address = getattr(item, "SenderEmailAddress", "") or ""
+    content = EmailContent(source_path=folder_name, parser="pypff")
+    content.subject = getattr(item, "get_subject", lambda: "")() or ""
+    sender_name = getattr(item, "get_sender_name", lambda: "")() or ""
+    sender_address = getattr(item, "get_sender_email_address", lambda: "")() or ""
     content.sender = sender_name or sender_address
 
     recips: List[str] = []
-    for field, prefix in (("To", ""), ("CC", "CC: "), ("BCC", "BCC: ")):
-        try:
-            value = getattr(item, field, None)
-            if value:
-                recips.append(f"{prefix}{value}")
-        except Exception:
-            continue
+    try:
+        for i in range(item.get_number_of_recipients()):
+            r = item.get_recipient(i)
+            name = getattr(r, "get_name", lambda: "")() or ""
+            email = getattr(r, "get_email_address", lambda: "")() or ""
+            recips.append(name or email)
+    except Exception:
+        pass
     content.recipients = recips
 
-    received = getattr(item, "ReceivedTime", None)
+    received = getattr(item, "get_delivery_time", lambda: None)()
     if isinstance(received, datetime):
         content.received_at = received.strftime("%Y-%m-%d %H:%M:%S")
     elif received:
         content.received_at = str(received)
 
-    created = getattr(item, "CreationTime", None)
+    created = getattr(item, "get_creation_time", lambda: None)()
     if isinstance(created, datetime):
         content.created_at = created.strftime("%Y-%m-%d %H:%M:%S")
     elif created:
         content.created_at = str(created)
 
-    content.body = getattr(item, "Body", "") or ""
+    body = getattr(item, "get_plain_text_body", lambda: "")() or ""
+    if not body:
+        body = getattr(item, "get_html_body", lambda: "")() or ""
+    content.body = body
     return content
 
 
