@@ -4,6 +4,14 @@ import argparse
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from email import policy
+from email.message import EmailMessage
+from email.parser import BytesParser
+import mailbox
+import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -76,11 +84,14 @@ def _parse_pst(path: Path) -> List[EmailContent]:
     try:
         import pypff  # type: ignore
     except Exception:
+        via_readpst = _parse_pst_via_readpst(path)
+        if via_readpst:
+            return via_readpst
         return [
             EmailContent(
                 source_path=str(path),
                 parser="pst",
-                error="missing dependency: install pypff (libpff) to parse .pst files on Linux",
+                error="missing dependency: install pypff (libpff) or readpst to parse .pst files",
             )
         ]
 
@@ -104,6 +115,109 @@ def _parse_pst(path: Path) -> List[EmailContent]:
         except Exception:
             pass
     return messages
+
+
+def _parse_pst_via_readpst(path: Path) -> List[EmailContent]:
+    """Fallback using readpst (libpst) CLI to convert PST -> mbox, then parse."""
+    if not shutil.which("readpst"):
+        return []
+
+    parsed: List[EmailContent] = []
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_dir = Path(tmpdir) / "out"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            ["readpst", "-o", str(out_dir), str(path)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return [
+                EmailContent(
+                    source_path=str(path),
+                    parser="readpst",
+                    error=f"readpst failed: {result.stderr.strip() or result.stdout.strip()}",
+                )
+            ]
+
+        mbox_files = [
+            p
+            for p in out_dir.rglob("*")
+            if p.is_file() and p.suffix.lower() in {".mbox", ".mbx", ""}
+        ]
+        if not mbox_files:
+            return [
+                EmailContent(
+                    source_path=str(path),
+                    parser="readpst",
+                    error="readpst succeeded but no mbox files were produced",
+                )
+            ]
+
+        for mbox_file in mbox_files:
+            parsed.extend(_parse_mbox_file(mbox_file, source=str(path)))
+    return parsed
+
+
+def _parse_mbox_file(mbox_path: Path, source: str) -> List[EmailContent]:
+    messages: List[EmailContent] = []
+    try:
+        mbox_obj = mailbox.mbox(
+            mbox_path, factory=lambda f: BytesParser(policy=policy.default).parse(f)
+        )
+    except Exception as exc:
+        return [
+            EmailContent(
+                source_path=str(source),
+                parser="readpst",
+                error=f"failed to open mbox {mbox_path}: {exc}",
+            )
+        ]
+
+    for msg in mbox_obj:
+        messages.append(_email_message_to_content(msg, source))
+    return messages
+
+
+def _email_message_to_content(message: EmailMessage, source: str) -> EmailContent:
+    content = EmailContent(source_path=source, parser="readpst")
+    content.subject = message.get("subject", "")
+    content.sender = message.get("from", "")
+    recips = []
+    for key in ("to", "cc", "bcc"):
+        if message.get_all(key):
+            recips.extend(message.get_all(key))
+    content.recipients = recips
+
+    date = message.get("date")
+    if date:
+        content.received_at = date
+
+    content.body = _extract_email_body(message)
+    return content
+
+
+def _extract_email_body(message: EmailMessage) -> str:
+    if message.is_multipart():
+        for part in message.walk():
+            if part.get_content_type() == "text/plain":
+                try:
+                    return part.get_content().strip()
+                except Exception:
+                    continue
+        for part in message.walk():
+            if part.get_content_type() == "text/html":
+                try:
+                    return _strip_html(part.get_content())
+                except Exception:
+                    continue
+        return ""
+    try:
+        if message.get_content_type() == "text/html":
+            return _strip_html(message.get_content())
+        return message.get_content().strip()
+    except Exception:
+        return ""
 
 
 def _collect_pst_folder(folder, messages: List[EmailContent], folder_name: Optional[str] = None):
