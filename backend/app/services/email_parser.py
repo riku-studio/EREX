@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import html
+import mailbox
 import re
+import shutil
+import subprocess
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
-import mailbox
-import os
-import shutil
-import subprocess
-import tempfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -31,8 +31,10 @@ class EmailContent:
     error: Optional[str] = None
 
 
-def _strip_html(html: str) -> str:
-    return re.sub(r"<[^>]+>", "", html)
+def _strip_html(html_text: str) -> str:
+    cleaned = re.sub(r"(?is)<(script|style).*?>.*?</\1>", "", html_text)
+    text = re.sub(r"<[^>]+>", "", cleaned)
+    return html.unescape(text)
 
 
 def _parse_msg(path: Path) -> EmailContent:
@@ -65,9 +67,17 @@ def _parse_msg(path: Path) -> EmailContent:
             content.received_at = str(raw_date)
 
         html_body = getattr(msg, "htmlBody", None)
+        rtf_body = getattr(msg, "rtfBody", None)
         body = msg.body or ""
         if not body and html_body:
             body = _strip_html(html_body)
+        if not body and rtf_body:
+            try:
+                import compressed_rtf
+
+                body = compressed_rtf.rtf_to_text(rtf_body)
+            except Exception:
+                body = ""
         content.body = body
         content.parser = "extract-msg"
     except Exception as exc:  # pragma: no cover - defensive
@@ -119,7 +129,7 @@ def _parse_pst(path: Path) -> List[EmailContent]:
 
 def _parse_pst_via_readpst(path: Path) -> List[EmailContent]:
     """Fallback using readpst (libpst) CLI to convert PST -> mbox, then parse."""
-    if not shutil.which("readpst"):
+    if shutil.which("readpst") is None:
         return []
 
     parsed: List[EmailContent] = []
@@ -272,7 +282,7 @@ def _pst_item_to_content(item, folder_name: str) -> EmailContent:
     body = getattr(item, "get_plain_text_body", lambda: "")() or ""
     if not body:
         body = getattr(item, "get_html_body", lambda: "")() or ""
-    content.body = body
+    content.body = _strip_html(body) if body else ""
     return content
 
 
@@ -322,7 +332,7 @@ def main():
                 "received_at": item.received_at,
                 "parser": item.parser or "n/a",
                 "error": item.error,
-                "body_preview": (item.body or "").strip()[:120],
+                "body_preview": (item.body or "").strip()[:180],
             }
         )
 

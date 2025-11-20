@@ -6,6 +6,10 @@ WORKDIR /app
 
 # 安装 uv
 RUN pip install uv
+# PST 支持：安装 readpst（libpst 提供）
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pst-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 # 复制项目文件
 COPY pyproject.toml uv.lock ./
