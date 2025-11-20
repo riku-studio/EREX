@@ -27,7 +27,10 @@
       aggregator (统一结构化)
             |
             v
-      PostgreSQL ←→ FastAPI → React 前端
+      (可选) PostgreSQL ←→ FastAPI → React 前端
 ```
 
-与“是否招聘”无关，该 Pipeline 可适用于任何 NLU 提取任务。
+说明：
+- 管线输入为邮件（eml/msg/pst），各模块可按配置开启/关闭。
+- 是否写入 PostgreSQL 取决于部署阶段需求，未启用时可直接返回结果给前端。
+- Pipeline 适用于泛 NLU 提取任务，并非限定招聘场景。
