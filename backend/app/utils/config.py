@@ -1,8 +1,13 @@
 # config.py
 import os
-from dotenv import load_dotenv
 
-# 自动加载 .env 文件（仅本地开发有效）
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*args, **kwargs):  # type: ignore
+        return False
+
+# 自动加载 .env 文件（仅本地开发有效；缺少依赖时静默跳过）
 load_dotenv()
 
 class Config:

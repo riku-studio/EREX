@@ -21,3 +21,6 @@ build/
 # Docker / Logs
 *.log
 pgdata/
+
+# data
+data/
