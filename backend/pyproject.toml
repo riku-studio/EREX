@@ -1,0 +1,18 @@
+[project]
+name = "myapp"
+version = "0.1.0"
+description = "A sample FastAPI project managed by uv"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.30.0",
+    "python-dotenv>=1.0.1"
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "httpx",
+    "ruff"
+]
