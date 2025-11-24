@@ -127,6 +127,61 @@ def _parse_pst(path: Path) -> List[EmailContent]:
     return messages
 
 
+def _extract_eml_body(message: EmailMessage) -> str:
+    """Return a plaintext body, stripping HTML if needed."""
+    if message.is_multipart():
+        plain: Optional[str] = None
+        html_body: Optional[str] = None
+        for part in message.walk():
+            if part.get_content_maintype() == "multipart":
+                continue
+            if part.get_content_type() == "text/plain" and plain is None:
+                try:
+                    plain = part.get_content()
+                except Exception:
+                    plain = None
+            elif part.get_content_type() == "text/html" and html_body is None:
+                try:
+                    html_body = part.get_content()
+                except Exception:
+                    html_body = None
+        if plain:
+            return plain
+        if html_body:
+            return _strip_html(html_body)
+        return ""
+    try:
+        if message.get_content_type() == "text/html":
+            return _strip_html(message.get_content())
+        return message.get_content()
+    except Exception:
+        return ""
+
+
+def _parse_eml(path: Path) -> EmailContent:
+    content = EmailContent(source_path=str(path), parser="eml")
+    try:
+        msg = BytesParser(policy=policy.default).parse(path.open("rb"))
+        content.subject = msg.get("subject", "") or ""
+        content.sender = msg.get("from", "") or ""
+
+        recips: List[str] = []
+        for key in ("to", "cc", "bcc"):
+            values = msg.get_all(key)
+            if values:
+                recips.extend(values)
+        content.recipients = recips
+
+        date_value = msg.get("date")
+        if date_value:
+            content.received_at = str(date_value)
+
+        content.body = _extract_eml_body(msg)
+    except Exception as exc:  # pragma: no cover - defensive
+        content.error = f"failed to parse eml: {exc}"
+    return content
+
+
 def _parse_pst_via_readpst(path: Path) -> List[EmailContent]:
     """Fallback using readpst (libpst) CLI to convert PST -> mbox, then parse."""
     if shutil.which("readpst") is None:
@@ -293,6 +348,8 @@ def parse_email_file(path: Path) -> List[EmailContent]:
         return [_parse_msg(path)]
     if suffix == ".pst":
         return _parse_pst(path)
+    if suffix == ".eml":
+        return [_parse_eml(path)]
     raise ValueError(f"unsupported file type: {suffix}")
 
 
@@ -302,6 +359,10 @@ def parse_directory(path: Path) -> List[EmailContent]:
         messages.extend(parse_email_file(msg_file))
     for msg_file in path.rglob("*.MSG"):
         messages.extend(parse_email_file(msg_file))
+    for eml_file in path.rglob("*.eml"):
+        messages.extend(parse_email_file(eml_file))
+    for eml_file in path.rglob("*.EML"):
+        messages.extend(parse_email_file(eml_file))
     for pst_file in path.rglob("*.pst"):
         messages.extend(parse_email_file(pst_file))
     for pst_file in path.rglob("*.PST"):
