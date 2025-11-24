@@ -42,10 +42,10 @@ def _rows(cleaned: List[tuple[EmailContent, str]], extractor: Optional[SemanticE
             "body_raw": item.body,
             "body_clean": body_clean,
             "semantic_text": semantic.text if semantic else "",
-            "semantic_score": ",".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
+            "semantic_score": "\n".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
             "semantic_start_line": semantic.start_line if semantic else "",
             "semantic_end_line": semantic.end_line if semantic else "",
-            "semantic_line_scores": ",".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
+            "semantic_line_scores": "\n".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
         }
 
 
