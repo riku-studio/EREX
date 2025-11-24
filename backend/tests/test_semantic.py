@@ -11,7 +11,7 @@ class FakeModel:
             "high": np.array([1.0, 0.0]),  # cosine with template -> 1
         }
 
-    def encode(self, sentences):
+    def encode(self, sentences, **kwargs):
         vectors = []
         for s in sentences:
             if "match" in s:
@@ -26,8 +26,8 @@ class FakeModel:
 
 
 def test_extract_picks_contiguous_block():
-    body = "intro line\nmatch line 1\nmatch line 2\nother line"
-    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5)
+    body = "intro line。match line 1。match line 2。other line"
+    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5, template=JOB_TEMPLATE)
     result = extractor.extract(body)
 
     assert result is not None
@@ -42,7 +42,7 @@ def test_extract_picks_contiguous_block():
 
 def test_extract_returns_none_when_no_match():
     body = "foo\nbar\nbaz"
-    extractor = SemanticExtractor(model=FakeModel(), threshold=0.9)
+    extractor = SemanticExtractor(model=FakeModel(), threshold=0.9, template=JOB_TEMPLATE)
     result = extractor.extract(body)
 
     assert result is not None
@@ -54,8 +54,8 @@ def test_extract_returns_none_when_no_match():
 
 
 def test_extract_start_to_last_hit_includes_gap():
-    body = "hit one\nmid gap\nhit two"
-    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5)
+    body = "hit one。mid gap。hit two"
+    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5, template=JOB_TEMPLATE)
     result = extractor.extract(body)
 
     assert result is not None

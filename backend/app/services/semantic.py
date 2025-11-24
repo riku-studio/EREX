@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Protocol, Sequence, Tuple
+from functools import lru_cache
+from typing import List, Optional, Protocol, Sequence
 
 import numpy as np
 
@@ -16,11 +18,12 @@ JOB_TEMPLATE = (
 
 
 class EmbeddingModel(Protocol):
-    def encode(self, sentences: Sequence[str]) -> List[List[float]]:  # pragma: no cover - interface
+    def encode(self, sentences: Sequence[str], *args, **kwargs) -> List[List[float]]:  # pragma: no cover - interface
         ...
 
 
-def default_model() -> EmbeddingModel:
+@lru_cache(maxsize=1)
+def _load_model() -> EmbeddingModel:
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError as exc:  # pragma: no cover - optional dependency
@@ -28,7 +31,20 @@ def default_model() -> EmbeddingModel:
             "semantic extraction requires sentence-transformers; install dependencies."
         ) from exc
 
+    logger.info(
+        "Loading semantic model %s on device=%s (batch_size=%d)",
+        Config.SEMANTIC_MODEL,
+        Config.SEMANTIC_DEVICE,
+        Config.SEMANTIC_BATCH_SIZE,
+    )
     return SentenceTransformer(Config.SEMANTIC_MODEL, device=Config.SEMANTIC_DEVICE)
+
+
+def split_to_sentences(text: str) -> List[str]:
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    # Split on JP/CN punctuation or newlines; remove empty pieces
+    parts = re.split(r"(?<=[。！？\?])\s*|\n+", normalized)
+    return [p for p in parts if p]
 
 
 @dataclass
@@ -42,36 +58,37 @@ class SemanticResult:
 
 
 class SemanticExtractor:
-    def __init__(self, model: EmbeddingModel | None = None, threshold: float | None = None):
-        self.model = model or default_model()
-        self.threshold = threshold if threshold is not None else Config.SEMANTIC_THRESHOLD
-        self.template_embedding = self._embed([JOB_TEMPLATE])[0]
+    def __init__(self, model: EmbeddingModel, template: str, threshold: float):
+        self.model = model
+        self.threshold = threshold
+        self.template_embedding = self._embed([template])[0]
 
-    def _embed(self, lines: Sequence[str]) -> List[np.ndarray]:
-        vectors = self.model.encode(lines)
-        return [np.array(v, dtype=float) for v in vectors]
+    def _embed(self, sentences: Sequence[str]) -> np.ndarray:
+        embeddings = self.model.encode(
+            sentences,
+            batch_size=Config.SEMANTIC_BATCH_SIZE,
+            show_progress_bar=False,
+            normalize_embeddings=True,
+        )
+        return np.asarray(embeddings, dtype=float)
 
-    @staticmethod
-    def _cosine(a: np.ndarray, b: np.ndarray) -> float:
-        denom = (np.linalg.norm(a) * np.linalg.norm(b)) or 1e-12
-        return float(np.dot(a, b) / denom)
-
-    def extract(self, body: str) -> SemanticResult | None:
-        lines = [line for line in body.splitlines()]
-        if not lines:
+    def extract(self, body: str) -> Optional[SemanticResult]:
+        sentences = split_to_sentences(body)
+        if not sentences:
             return None
 
-        line_embeddings = self._embed(lines)
-        sims = [self._cosine(vec, self.template_embedding) for vec in line_embeddings]
+        sentence_embeddings = self._embed(sentences)
+        sims = sentence_embeddings @ self.template_embedding  # cosine since normalized
+
         logger.info(
-            "Semantic scoring: lines=%d, threshold=%.3f, scores=%s",
-            len(lines),
+            "Semantic scoring: sentences=%d, threshold=%.3f, scores=%s",
+            len(sentences),
             self.threshold,
             ", ".join(f"{i}:{s:.3f}" for i, s in enumerate(sims)),
         )
 
-        hit_indices = [idx for idx, sim in enumerate(sims) if sim >= self.threshold]
-        if not hit_indices:
+        hits = np.where(sims >= self.threshold)[0]
+        if hits.size == 0:
             return SemanticResult(
                 text="",
                 score=0.0,
@@ -81,12 +98,11 @@ class SemanticExtractor:
                 line_scores=[float(v) for v in sims],
             )
 
-        start_idx = min(hit_indices)
-        end_idx = max(hit_indices)
-        hit_scores = [sims[i] for i in hit_indices]
-        score = float(np.mean(hit_scores))
+        start_idx = int(hits.min())
+        end_idx = int(hits.max())
+        score = float(np.mean(sims[hits]))
+        segment_text = "\n".join(s.rstrip("。！？?") for s in sentences[start_idx : end_idx + 1]).strip()
 
-        segment_text = "\n".join(lines[start_idx : end_idx + 1]).strip()
         return SemanticResult(
             text=segment_text,
             score=score,
@@ -98,4 +114,9 @@ class SemanticExtractor:
 
 
 def get_semantic_extractor(model: EmbeddingModel | None = None) -> SemanticExtractor:
-    return SemanticExtractor(model=model)
+    active_model = model or _load_model()
+    return SemanticExtractor(
+        model=active_model,
+        template=JOB_TEMPLATE,
+        threshold=Config.SEMANTIC_THRESHOLD,
+    )

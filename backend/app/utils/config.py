@@ -58,6 +58,7 @@ class Config:
     SEMANTIC_MODEL = os.getenv("SEMANTIC_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
     SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "cpu")
+    SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
 
     # Index rule source
     INDEX_RULE_SOURCE = os.getenv("INDEX_RULE_SOURCE", "file").lower()
