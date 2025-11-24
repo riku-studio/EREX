@@ -18,6 +18,8 @@ class FakeModel:
                 vectors.append(self._templates["high"])
             elif s == JOB_TEMPLATE:
                 vectors.append(self._templates["high"])
+            elif "hit" in s:
+                vectors.append(self._templates["high"])
             else:
                 vectors.append(self._templates["low"])
         return vectors
@@ -32,6 +34,9 @@ def test_extract_picks_contiguous_block():
     assert result.text == "match line 1\nmatch line 2"
     assert result.start_line == 1
     assert result.end_line == 2
+    assert len(result.line_scores) == 4
+    assert result.line_scores[1] >= 0.5
+    assert result.line_scores[2] >= 0.5
 
 
 def test_extract_returns_none_when_no_match():
@@ -40,3 +45,14 @@ def test_extract_returns_none_when_no_match():
     result = extractor.extract(body)
 
     assert result is None
+
+
+def test_extract_start_to_last_hit_includes_gap():
+    body = "hit one\nmid gap\nhit two"
+    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5)
+    result = extractor.extract(body)
+
+    assert result is not None
+    assert result.text == "hit one\nmid gap\nhit two"
+    assert result.start_line == 0
+    assert result.end_line == 2

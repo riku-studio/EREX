@@ -36,6 +36,6 @@ def _normalize_whitespace(text: str) -> str:
     lines = []
     for line in normalized_newlines.split("\n"):
         cleaned = _INLINE_SPACE_RE.sub(" ", line).strip()
-        lines.append(cleaned)
-    # 保留原有换行，仅去除首尾空行
-    return "\n".join(lines).strip("\n")
+        if cleaned:  # 删除空行
+            lines.append(cleaned)
+    return "\n".join(lines)

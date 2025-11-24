@@ -27,7 +27,7 @@ def default_model() -> EmbeddingModel:
             "semantic extraction requires sentence-transformers; install dependencies."
         ) from exc
 
-    return SentenceTransformer(Config.SEMANTIC_MODEL)
+    return SentenceTransformer(Config.SEMANTIC_MODEL, device=Config.SEMANTIC_DEVICE)
 
 
 @dataclass
@@ -36,6 +36,7 @@ class SemanticResult:
     score: float
     start_line: int
     end_line: int
+    line_scores: List[float]
 
 
 class SemanticExtractor:
@@ -61,42 +62,23 @@ class SemanticExtractor:
         line_embeddings = self._embed(lines)
         sims = [self._cosine(vec, self.template_embedding) for vec in line_embeddings]
 
-        best_segment: Tuple[int, int, float] | None = None  # start, end inclusive, score
-        start = None
-        for idx, sim in enumerate(sims):
-            if sim >= self.threshold:
-                start = idx if start is None else start
-            else:
-                if start is not None:
-                    end = idx - 1
-                    segment_score = float(np.mean(sims[start : end + 1]))
-                    best_segment = self._pick_better(best_segment, (start, end, segment_score))
-                    start = None
-        if start is not None:
-            end = len(sims) - 1
-            segment_score = float(np.mean(sims[start : end + 1]))
-            best_segment = self._pick_better(best_segment, (start, end, segment_score))
-
-        if not best_segment:
+        hit_indices = [idx for idx, sim in enumerate(sims) if sim >= self.threshold]
+        if not hit_indices:
             return None
 
-        start_idx, end_idx, score = best_segment
-        segment_text = "\n".join(lines[start_idx : end_idx + 1]).strip()
-        return SemanticResult(text=segment_text, score=score, start_line=start_idx, end_line=end_idx)
+        start_idx = min(hit_indices)
+        end_idx = max(hit_indices)
+        hit_scores = [sims[i] for i in hit_indices]
+        score = float(np.mean(hit_scores))
 
-    @staticmethod
-    def _pick_better(
-        current: Tuple[int, int, float] | None, candidate: Tuple[int, int, float]
-    ) -> Tuple[int, int, float]:
-        if current is None:
-            return candidate
-        curr_len = current[1] - current[0]
-        cand_len = candidate[1] - candidate[0]
-        if cand_len > curr_len:
-            return candidate
-        if cand_len == curr_len and candidate[2] > current[2]:
-            return candidate
-        return current
+        segment_text = "\n".join(lines[start_idx : end_idx + 1]).strip()
+        return SemanticResult(
+            text=segment_text,
+            score=score,
+            start_line=start_idx,
+            end_line=end_idx,
+            line_scores=[float(v) for v in sims],
+        )
 
 
 def get_semantic_extractor(model: EmbeddingModel | None = None) -> SemanticExtractor:

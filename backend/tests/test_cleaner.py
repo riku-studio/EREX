@@ -19,4 +19,4 @@ def test_clean_body_from_email_content():
 
 def test_clean_body_keeps_newlines_from_text():
     raw = "a line\n  another\tline\n\nlast"
-    assert clean_body(raw) == "a line\nanother line\n\nlast"
+    assert clean_body(raw) == "a line\nanother line\nlast"

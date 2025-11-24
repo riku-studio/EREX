@@ -57,6 +57,7 @@ class Config:
     # Semantic (template-based) extraction
     SEMANTIC_MODEL = os.getenv("SEMANTIC_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
+    SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "cpu")
 
     # Index rule source
     INDEX_RULE_SOURCE = os.getenv("INDEX_RULE_SOURCE", "file").lower()
@@ -75,6 +76,7 @@ class Config:
             "log_to_file": cls.LOG_TO_FILE,
             "semantic_model": cls.SEMANTIC_MODEL,
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
+            "semantic_device": cls.SEMANTIC_DEVICE,
             "index_rule_source": cls.INDEX_RULE_SOURCE,
             "index_rules_path": cls.INDEX_RULES_PATH,
             "index_rule_table": cls.INDEX_RULE_TABLE,

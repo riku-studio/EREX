@@ -45,6 +45,7 @@ def _rows(contents: Iterable[EmailContent], extractor: Optional[SemanticExtracto
             "semantic_score": f"{semantic.score:.4f}" if semantic else "",
             "semantic_start_line": semantic.start_line if semantic else "",
             "semantic_end_line": semantic.end_line if semantic else "",
+            "semantic_line_scores": ",".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
         }
 
 
@@ -75,10 +76,16 @@ def export_to_csv(input_path: Path, output_path: Path):
                 "semantic_score",
                 "semantic_start_line",
                 "semantic_end_line",
+                "semantic_line_scores",
             ],
         )
         writer.writeheader()
-        writer.writerows(_rows(contents, extractor))
+        rows = list(_rows(contents, extractor))
+        for idx, row in enumerate(rows, start=1):
+            if idx % 10 == 0:
+                print(f"[progress] 已写入 {idx}/{len(rows)} 条")
+            writer.writerow(row)
+        print(f"[done] 共导出 {len(rows)} 条记录 -> {output_path}")
 
 
 def main():
