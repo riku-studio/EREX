@@ -7,8 +7,14 @@
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 from typing import Iterable, List
+
+# 确保 backend 根目录在 sys.path 中，便于直接运行脚本
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.cleaner import clean_body
 from app.services.email_parser import EmailContent, parse_directory, parse_email_file
