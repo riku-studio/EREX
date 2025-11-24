@@ -344,6 +344,7 @@ def _pst_item_to_content(item, folder_name: str) -> EmailContent:
 def parse_email_file(path: Path) -> List[EmailContent]:
     path = path.resolve()
     suffix = path.suffix.lower()
+    logger.info("Parsing email file: %s", path)
     if suffix == ".msg":
         return [_parse_msg(path)]
     if suffix == ".pst":
@@ -354,6 +355,7 @@ def parse_email_file(path: Path) -> List[EmailContent]:
 
 
 def parse_directory(path: Path) -> List[EmailContent]:
+    logger.info("Scanning directory for email files: %s", path)
     messages: List[EmailContent] = []
     for msg_file in path.rglob("*.msg"):
         messages.extend(parse_email_file(msg_file))
@@ -367,6 +369,7 @@ def parse_directory(path: Path) -> List[EmailContent]:
         messages.extend(parse_email_file(pst_file))
     for pst_file in path.rglob("*.PST"):
         messages.extend(parse_email_file(pst_file))
+    logger.info("Finished directory scan, parsed %d messages", len(messages))
     return messages
 
 

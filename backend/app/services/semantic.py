@@ -6,6 +6,7 @@ from typing import Iterable, List, Protocol, Sequence, Tuple
 import numpy as np
 
 from app.utils.config import Config
+from app.utils.logging import logger
 
 JOB_TEMPLATE = (
     "求人情報, 採用情報, スキル要件, 必須条件, 歓迎条件, 募集要項, 業務内容, "
@@ -61,6 +62,12 @@ class SemanticExtractor:
 
         line_embeddings = self._embed(lines)
         sims = [self._cosine(vec, self.template_embedding) for vec in line_embeddings]
+        logger.info(
+            "Semantic scoring: lines=%d, threshold=%.3f, scores=%s",
+            len(lines),
+            self.threshold,
+            ", ".join(f"{i}:{s:.3f}" for i, s in enumerate(sims)),
+        )
 
         hit_indices = [idx for idx, sim in enumerate(sims) if sim >= self.threshold]
         if not hit_indices:

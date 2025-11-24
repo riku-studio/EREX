@@ -4,6 +4,8 @@ import html
 import re
 from typing import TYPE_CHECKING
 
+from app.utils.logging import logger
+
 if TYPE_CHECKING:  # pragma: no cover - import guard for type hints
     from app.services.email_parser import EmailContent
 
@@ -28,7 +30,9 @@ def strip_html(text: str) -> str:
 def clean_body(source: str | "EmailContent") -> str:
     """Extract the text body and remove HTML. Accepts raw text or EmailContent."""
     raw = source.body if hasattr(source, "body") else str(source or "")
-    return strip_html(raw)
+    cleaned = strip_html(raw)
+    logger.info("Cleaned body: input_len=%d, output_len=%d", len(raw), len(cleaned))
+    return cleaned
 
 
 def _normalize_whitespace(text: str) -> str:
