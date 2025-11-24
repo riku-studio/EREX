@@ -9,7 +9,7 @@ import argparse
 import csv
 import sys
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 # 确保 backend 根目录在 sys.path 中，便于直接运行脚本
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +18,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.services.cleaner import clean_body
 from app.services.email_parser import EmailContent, parse_directory, parse_email_file
+from app.services.semantic import SemanticExtractor, get_semantic_extractor
 
 
 def _load_messages(target: Path) -> List[EmailContent]:
@@ -26,8 +27,10 @@ def _load_messages(target: Path) -> List[EmailContent]:
     return parse_directory(target)
 
 
-def _rows(contents: Iterable[EmailContent]):
+def _rows(contents: Iterable[EmailContent], extractor: Optional[SemanticExtractor]):
     for item in contents:
+        body_clean = clean_body(item)
+        semantic = extractor.extract(body_clean) if extractor else None
         yield {
             "source_path": item.source_path,
             "subject": item.subject,
@@ -36,13 +39,24 @@ def _rows(contents: Iterable[EmailContent]):
             "received_at": item.received_at or "",
             "parser": item.parser,
             "error": item.error or "",
-            "body_clean": clean_body(item),
+            "body_raw": item.body,
+            "body_clean": body_clean,
+            "semantic_text": semantic.text if semantic else "",
+            "semantic_score": f"{semantic.score:.4f}" if semantic else "",
+            "semantic_start_line": semantic.start_line if semantic else "",
+            "semantic_end_line": semantic.end_line if semantic else "",
         }
 
 
 def export_to_csv(input_path: Path, output_path: Path):
     contents = _load_messages(input_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        extractor = get_semantic_extractor()
+    except Exception as exc:
+        print(f"[warn] 语义模型加载失败，跳过语义列: {exc}", file=sys.stderr)
+        extractor = None
 
     with output_path.open("w", newline="", encoding="utf-8") as fp:
         writer = csv.DictWriter(
@@ -55,11 +69,16 @@ def export_to_csv(input_path: Path, output_path: Path):
                 "received_at",
                 "parser",
                 "error",
+                "body_raw",
                 "body_clean",
+                "semantic_text",
+                "semantic_score",
+                "semantic_start_line",
+                "semantic_end_line",
             ],
         )
         writer.writeheader()
-        writer.writerows(_rows(contents))
+        writer.writerows(_rows(contents, extractor))
 
 
 def main():
