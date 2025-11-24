@@ -15,6 +15,7 @@ RUN apt-get update \
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY ./app ./app
+COPY ./config ./config
 COPY .env.example .env
 
 # 启动命令

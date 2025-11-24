@@ -1,0 +1,16 @@
+{
+  "rules": [
+    {
+      "name": "subject_keywords",
+      "pattern": "(?i)java|python|golang|node",
+      "description": "Match common tech keywords in subject for quick indexing",
+      "enabled": true
+    },
+    {
+      "name": "section_heading_split",
+      "pattern": "(?=【[^】]+】)|(?=■案件)|(?=◆案件)",
+      "description": "Split body into blocks using common heading markers",
+      "enabled": true
+    }
+  ]
+}

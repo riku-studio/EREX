@@ -13,6 +13,7 @@ build/
 .env
 .env.*
 .uv_cache/
+AGENTS.md
 
 # OS / IDE
 .DS_Store

@@ -1,5 +1,6 @@
 # config.py
 import os
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -9,6 +10,27 @@ except ModuleNotFoundError:
 
 # 自动加载 .env 文件（仅本地开发有效；缺少依赖时静默跳过）
 load_dotenv()
+
+
+# 当前项目根目录（backend/app/utils/../../.. -> repo 根）
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _default_index_rules_path() -> str:
+    """Choose a default path for index rules loaded from config files."""
+
+    candidates = [
+        PROJECT_ROOT / "backend" / "config" / "index_rules.json",
+        PROJECT_ROOT / "config" / "index_rules.json",
+        BACKEND_ROOT / "config" / "index_rules.json",
+    ]
+
+    for path in candidates:
+        if path.exists():
+            return str(path)
+
+    return str(candidates[0])
 
 class Config:
     """Global configuration manager"""
@@ -32,6 +54,11 @@ class Config:
     LOG_FORMAT = os.getenv("LOG_FORMAT", "plain")
     LOG_TO_FILE = os.getenv("LOG_TO_FILE", "false").lower() == "true"
 
+    # Index rule source
+    INDEX_RULE_SOURCE = os.getenv("INDEX_RULE_SOURCE", "file").lower()
+    INDEX_RULES_PATH = os.getenv("INDEX_RULES_PATH", _default_index_rules_path())
+    INDEX_RULE_TABLE = os.getenv("INDEX_RULE_TABLE", "index_rules")
+
     @classmethod
     def summary(cls):
         """Print summary (for debugging)"""
@@ -42,6 +69,9 @@ class Config:
             "log_level": cls.LOG_LEVEL,
             "log_format": cls.LOG_FORMAT,
             "log_to_file": cls.LOG_TO_FILE,
+            "index_rule_source": cls.INDEX_RULE_SOURCE,
+            "index_rules_path": cls.INDEX_RULES_PATH,
+            "index_rule_table": cls.INDEX_RULE_TABLE,
         }
 
 
