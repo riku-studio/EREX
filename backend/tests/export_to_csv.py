@@ -27,9 +27,8 @@ def _load_messages(target: Path) -> List[EmailContent]:
     return parse_directory(target)
 
 
-def _rows(contents: Iterable[EmailContent], extractor: Optional[SemanticExtractor]):
-    for item in contents:
-        body_clean = clean_body(item)
+def _rows(cleaned: List[tuple[EmailContent, str]], extractor: Optional[SemanticExtractor]):
+    for item, body_clean in cleaned:
         semantic = extractor.extract(body_clean) if extractor else None
         yield {
             "source_path": item.source_path,
@@ -42,7 +41,7 @@ def _rows(contents: Iterable[EmailContent], extractor: Optional[SemanticExtracto
             "body_raw": item.body,
             "body_clean": body_clean,
             "semantic_text": semantic.text if semantic else "",
-            "semantic_score": f"{semantic.score:.4f}" if semantic else "",
+            "semantic_score": ",".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
             "semantic_start_line": semantic.start_line if semantic else "",
             "semantic_end_line": semantic.end_line if semantic else "",
             "semantic_line_scores": ",".join(f"{s:.4f}" for s in (semantic.line_scores if semantic else [])),
@@ -52,6 +51,9 @@ def _rows(contents: Iterable[EmailContent], extractor: Optional[SemanticExtracto
 def export_to_csv(input_path: Path, output_path: Path):
     contents = _load_messages(input_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Batch cleaning %d messages", len(contents))
+    cleaned = [(item, clean_body(item)) for item in contents]
 
     try:
         extractor = get_semantic_extractor()
@@ -80,7 +82,7 @@ def export_to_csv(input_path: Path, output_path: Path):
             ],
         )
         writer.writeheader()
-        rows = list(_rows(contents, extractor))
+        rows = list(_rows(cleaned, extractor))
         for idx, row in enumerate(rows, start=1):
             if idx % 10 == 0:
                 print(f"[progress] 已写入 {idx}/{len(rows)} 条")

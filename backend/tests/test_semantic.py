@@ -31,6 +31,7 @@ def test_extract_picks_contiguous_block():
     result = extractor.extract(body)
 
     assert result is not None
+    assert result.matched is True
     assert result.text == "match line 1\nmatch line 2"
     assert result.start_line == 1
     assert result.end_line == 2
@@ -44,7 +45,12 @@ def test_extract_returns_none_when_no_match():
     extractor = SemanticExtractor(model=FakeModel(), threshold=0.9)
     result = extractor.extract(body)
 
-    assert result is None
+    assert result is not None
+    assert result.matched is False
+    assert result.text == ""
+    assert result.start_line is None
+    assert result.end_line is None
+    assert len(result.line_scores) == 3
 
 
 def test_extract_start_to_last_hit_includes_gap():
@@ -53,6 +59,7 @@ def test_extract_start_to_last_hit_includes_gap():
     result = extractor.extract(body)
 
     assert result is not None
+    assert result.matched is True
     assert result.text == "hit one\nmid gap\nhit two"
     assert result.start_line == 0
     assert result.end_line == 2

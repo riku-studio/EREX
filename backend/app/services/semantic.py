@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Protocol, Sequence, Tuple
+from typing import Iterable, List, Optional, Protocol, Sequence, Tuple
 
 import numpy as np
 
@@ -35,8 +35,9 @@ def default_model() -> EmbeddingModel:
 class SemanticResult:
     text: str
     score: float
-    start_line: int
-    end_line: int
+    start_line: Optional[int]
+    end_line: Optional[int]
+    matched: bool
     line_scores: List[float]
 
 
@@ -71,7 +72,14 @@ class SemanticExtractor:
 
         hit_indices = [idx for idx, sim in enumerate(sims) if sim >= self.threshold]
         if not hit_indices:
-            return None
+            return SemanticResult(
+                text="",
+                score=0.0,
+                start_line=None,
+                end_line=None,
+                matched=False,
+                line_scores=[float(v) for v in sims],
+            )
 
         start_idx = min(hit_indices)
         end_idx = max(hit_indices)
@@ -84,6 +92,7 @@ class SemanticExtractor:
             score=score,
             start_line=start_idx,
             end_line=end_idx,
+            matched=True,
             line_scores=[float(v) for v in sims],
         )
 
