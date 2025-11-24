@@ -54,6 +54,10 @@ class Config:
     LOG_FORMAT = os.getenv("LOG_FORMAT", "plain")
     LOG_TO_FILE = os.getenv("LOG_TO_FILE", "false").lower() == "true"
 
+    # Semantic (template-based) extraction
+    SEMANTIC_MODEL = os.getenv("SEMANTIC_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
+
     # Index rule source
     INDEX_RULE_SOURCE = os.getenv("INDEX_RULE_SOURCE", "file").lower()
     INDEX_RULES_PATH = os.getenv("INDEX_RULES_PATH", _default_index_rules_path())
@@ -69,6 +73,8 @@ class Config:
             "log_level": cls.LOG_LEVEL,
             "log_format": cls.LOG_FORMAT,
             "log_to_file": cls.LOG_TO_FILE,
+            "semantic_model": cls.SEMANTIC_MODEL,
+            "semantic_threshold": cls.SEMANTIC_THRESHOLD,
             "index_rule_source": cls.INDEX_RULE_SOURCE,
             "index_rules_path": cls.INDEX_RULES_PATH,
             "index_rule_table": cls.INDEX_RULE_TABLE,
