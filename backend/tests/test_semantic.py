@@ -7,8 +7,8 @@ class FakeModel:
     def __init__(self):
         # Encode template once
         self._templates = {
-            "low": np.array([0.0, 1.0]),
-            "high": np.array([1.0, 1.0]),
+            "low": np.array([0.0, 1.0]),  # cosine with template -> 0
+            "high": np.array([1.0, 0.0]),  # cosine with template -> 1
         }
 
     def encode(self, sentences):
