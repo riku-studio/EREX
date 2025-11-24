@@ -19,6 +19,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.services.cleaner import clean_body
 from app.services.email_parser import EmailContent, parse_directory, parse_email_file
 from app.services.semantic import SemanticExtractor, get_semantic_extractor
+from app.utils.logging import logger
 
 
 def _load_messages(target: Path) -> List[EmailContent]:
@@ -52,7 +53,7 @@ def export_to_csv(input_path: Path, output_path: Path):
     contents = _load_messages(input_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Batch cleaning %d messages", len(contents))
+    print(f"[info] Batch cleaning {len(contents)} messages")
     cleaned = [(item, clean_body(item)) for item in contents]
 
     try:
