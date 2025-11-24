@@ -8,6 +8,7 @@
 ## 规划要点
 - 模式建议：`core`（系统表、任务、模板）、`analysis`（解析结果、分块、关键词命中）、`audit`（操作日志）。
 - 连接方式：环境变量 `DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME`，在 `Config` 中读取；索引表名由 `INDEX_RULE_TABLE` 控制。
+- 数据库驱动：镜像已预装 `asyncpg`，以便直接启用数据库模式。
 - 迁移工具：待功能落地后再确定（如 Alembic），当前无迁移脚本。
 
 ## 何时可以关闭数据库

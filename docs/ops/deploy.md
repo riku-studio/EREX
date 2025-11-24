@@ -4,7 +4,7 @@
 1. 复制环境变量模板：`cp .env.example .env`，按需修改端口/数据库口令。
 2. 选择索引规则存储方式：
    - 配置文件（默认）：保持 `INDEX_RULE_SOURCE=file`，规则从 `backend/config/index_rules.json` 读取；无需启动数据库。
-   - 数据库：设置 `INDEX_RULE_SOURCE=db`，可选指定 `INDEX_RULE_TABLE`；需要安装数据库驱动（如 asyncpg）并启动 `db` 服务。
+   - 数据库：设置 `INDEX_RULE_SOURCE=db`，可选指定 `INDEX_RULE_TABLE`；镜像已包含 `asyncpg`，需启动 `db` 服务。
 3. 启动：
    - 文件模式：`cd infra && docker compose up --build`
    - 数据库模式：`cd infra && docker compose --profile db up --build`
@@ -24,4 +24,4 @@
 ## 配置约定
 - 所有服务依赖根层 `.env`；敏感值不提交版本库。
 - 端口策略：对外只开放前端；backend/db 通过容器网络访问。
-- 可选组件：默认不启动数据库；当 `INDEX_RULE_SOURCE=db` 时使用 `--profile db` 追加数据库服务，并确保容器包含数据库驱动。
+- 可选组件：默认不启动数据库；当 `INDEX_RULE_SOURCE=db` 时使用 `--profile db` 追加数据库服务（驱动已内置）。

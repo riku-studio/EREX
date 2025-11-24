@@ -19,7 +19,7 @@ EREX（Extensible Email Extraction System）是一套可配置、可扩展的邮
   - 分块规则：`config/patterns/*.json`
   - 关键词字典：`config/keywords/*.json`
   - 分类规则：`config/classifiers/*.json`
-  - 索引规则：默认从 `backend/config/index_rules.json` 读取，可切换为数据库表（`INDEX_RULE_TABLE`）。
+  - 索引规则：默认从 `backend/config/index_rules.json` 读取，可切换为数据库表（`INDEX_RULE_TABLE`），由 index-rule 服务统一对 Pipeline 暴露，不影响上层调用。
 
 运行形态
 - 本地/开发：通过 `infra/docker-compose.yml` 以多容器方式启动，frontend 暴露 `127.0.0.1:3000`；默认仅启动前后端，如需数据库索引规则存储，使用 `--profile db` 追加 PostgreSQL。

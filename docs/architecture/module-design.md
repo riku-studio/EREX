@@ -91,6 +91,8 @@ body_clean
 /config/patterns/legal_split.json
 ```
 
+> 索引/分块/分类规则的来源（文件或数据库）由内部服务统一加载，Pipeline 只消费统一结构，不需感知来源。
+
 规则格式：
 
 ```json
