@@ -1,0 +1,328 @@
+{
+  "programming_languages": [
+    "C",
+    "C++",
+    "C#",
+    "Java",
+    "Kotlin",
+    "Scala",
+    "Python",
+    "Ruby",
+    "PHP",
+    "JavaScript",
+    "TypeScript",
+    "Go",
+    "Rust",
+    "Swift",
+    "Objective-C",
+    "VB.NET",
+    "F#",
+    "R",
+    "SQL",
+    "Shell Script",
+    "Bash",
+    "Zsh"
+  ],
+
+  "frontend_core": [
+    "HTML",
+    "CSS",
+    "Sass",
+    "Less"
+  ],
+
+  "frontend_frameworks": [
+    "React",
+    "Next.js",
+    "Vue.js",
+    "Nuxt.js",
+    "Angular",
+    "jQuery",
+    "Tailwind CSS",
+    "Bootstrap",
+    "Storybook"
+  ],
+
+  "frontend_tooling": [
+    "Webpack",
+    "Vite",
+    "Babel",
+    "ESLint"
+  ],
+
+  "backend_frameworks_java": [
+    "Spring",
+    "Spring Boot",
+    "Spring MVC",
+    "MyBatis",
+    "Hibernate"
+  ],
+
+  "backend_frameworks_python": [
+    "Django",
+    "Flask",
+    "FastAPI"
+  ],
+
+  "backend_frameworks_js_ts": [
+    "Node.js",
+    "Express",
+    "NestJS"
+  ],
+
+  "backend_frameworks_php": [
+    "Laravel",
+    "Symfony",
+    "CodeIgniter"
+  ],
+
+  "backend_frameworks_ruby": [
+    "Ruby on Rails"
+  ],
+
+  "backend_frameworks_go": [
+    "Gin",
+    "Echo"
+  ],
+
+  "backend_frameworks_dotnet": [
+    "ASP.NET",
+    "ASP.NET Core"
+  ],
+
+  "client_mobile": [
+    "Android",
+    "iOS",
+    "React Native",
+    "Flutter",
+    "Xamarin",
+    "SwiftUI",
+    "Electron",
+    "Qt"
+  ],
+
+  "databases_rdbms": [
+    "Oracle",
+    "MySQL",
+    "MariaDB",
+    "PostgreSQL",
+    "SQL Server",
+    "Db2"
+  ],
+
+  "databases_nosql": [
+    "MongoDB",
+    "Cassandra",
+    "Couchbase",
+    "DynamoDB"
+  ],
+
+  "cache_search": [
+    "Redis",
+    "Memcached",
+    "Elasticsearch",
+    "Solr"
+  ],
+
+  "bigdata_streaming": [
+    "Hadoop",
+    "Spark",
+    "Hive",
+    "Kafka"
+  ],
+
+  "operating_systems": [
+    "Linux",
+    "Windows Server",
+    "Unix",
+    "AIX",
+    "HP-UX",
+    "Solaris",
+    "macOS"
+  ],
+
+  "middleware_appservers": [
+    "Apache HTTP Server",
+    "Nginx",
+    "IIS",
+    "Tomcat",
+    "WildFly",
+    "WebSphere",
+    "WebLogic"
+  ],
+
+  "cloud_platforms": [
+    "AWS",
+    "Azure",
+    "GCP",
+    "Oracle Cloud",
+    "IBM Cloud"
+  ],
+
+  "cloud_services_example": [
+    "EC2",
+    "S3",
+    "RDS",
+    "Lambda",
+    "CloudFront",
+    "VPC",
+    "IAM",
+    "CloudWatch"
+  ],
+
+  "containers_orchestration": [
+    "Docker",
+    "Kubernetes",
+    "OpenShift",
+    "Docker Swarm"
+  ],
+
+  "devops_ci_cd": [
+    "Jenkins",
+    "GitLab CI",
+    "GitHub Actions",
+    "CircleCI",
+    "Travis CI",
+    "Argo CD"
+  ],
+
+  "devops_iac": [
+    "Terraform",
+    "Ansible",
+    "CloudFormation",
+    "Chef",
+    "Puppet"
+  ],
+
+  "monitoring_logging": [
+    "Prometheus",
+    "Grafana",
+    "Datadog",
+    "Zabbix",
+    "New Relic",
+    "Elasticsearch",
+    "Logstash",
+    "Kibana"
+  ],
+
+  "networking_core": [
+    "TCP/IP",
+    "DNS",
+    "HTTP",
+    "HTTPS",
+    "VPN",
+    "VLAN",
+    "Firewall",
+    "Load Balancer",
+    "Proxy"
+  ],
+
+  "network_vendors": [
+    "Cisco",
+    "Juniper",
+    "Fortinet",
+    "Palo Alto Networks"
+  ],
+
+  "security": [
+    "WAF",
+    "IDS",
+    "IPS",
+    "SIEM",
+    "PKI",
+    "SSL",
+    "TLS",
+    "OAuth",
+    "OpenID Connect",
+    "Zero Trust"
+  ],
+
+  "data_tools": [
+    "ETL",
+    "Informatica",
+    "Talend",
+    "Tableau",
+    "Power BI",
+    "Data Warehouse",
+    "Data Lake"
+  ],
+
+  "python_data_stack": [
+    "NumPy",
+    "Pandas",
+    "Scikit-learn",
+    "Matplotlib"
+  ],
+
+  "ml_ai_frameworks": [
+    "TensorFlow",
+    "Keras",
+    "PyTorch",
+    "ONNX",
+    "Transformers"
+  ],
+
+  "ml_ops": [
+    "MLflow",
+    "Kubeflow",
+    "Airflow"
+  ],
+
+  "version_control": [
+    "Git",
+    "GitHub",
+    "GitLab",
+    "Bitbucket",
+    "Subversion",
+    "SVN"
+  ],
+
+  "collaboration_pm": [
+    "Jira",
+    "Confluence",
+    "Redmine",
+    "Trello",
+    "Asana",
+    "Slack",
+    "Microsoft Teams"
+  ],
+
+  "ide_editors": [
+    "Visual Studio Code",
+    "VS Code",
+    "Visual Studio",
+    "IntelliJ IDEA",
+    "PyCharm",
+    "Eclipse",
+    "Android Studio",
+    "Xcode"
+  ],
+
+  "dev_process_jp": [
+    "要件定義",
+    "基本設計",
+    "詳細設計",
+    "外部設計",
+    "内部設計",
+    "実装",
+    "単体テスト",
+    "結合テスト",
+    "システムテスト",
+    "総合テスト",
+    "受け入れテスト",
+    "本番リリース",
+    "本番導入",
+    "運用・保守",
+    "障害対応",
+    "性能チューニング",
+    "ウォーターフォール開発",
+    "アジャイル開発",
+    "スクラム開発",
+    "プロジェクトマネジメント",
+    "PM",
+    "PL",
+    "チームリーダー経験",
+    "ドキュメント作成",
+    "顧客折衝"
+  ]
+}

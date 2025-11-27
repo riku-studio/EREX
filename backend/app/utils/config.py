@@ -42,6 +42,10 @@ def _default_semantic_templates_path() -> str:
     return str(PROJECT_ROOT / "backend" / "config" / "semantic_job_templates.json")
 
 
+def _default_keywords_path() -> str:
+    return str(PROJECT_ROOT / "backend" / "config" / "keywords_tech.json")
+
+
 def _load_json(path: str) -> dict:
     try:
         return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -90,6 +94,10 @@ class Config:
         os.getenv("SEMANTIC_JOB_FIELD_THRESHOLD", _SEMANTIC_TEMPLATES.get("field_threshold", 0.4))
     )
 
+    # Keyword extractor
+    KEYWORDS_TECH_PATH = os.getenv("KEYWORDS_TECH_PATH", _default_keywords_path())
+    _KEYWORDS_TECH = _load_json(KEYWORDS_TECH_PATH)
+
     # Splitter (multi-block detection)
     SPLITTER_SKIP_LINES = int(os.getenv("SPLITTER_SKIP_LINES", 5))
     SPLITTER_MARKER_PATTERNS = [
@@ -133,6 +141,7 @@ class Config:
             "semantic_context_radius": cls.SEMANTIC_CONTEXT_RADIUS,
             "semantic_global_threshold": cls.SEMANTIC_JOB_GLOBAL_THRESHOLD,
             "semantic_field_threshold": cls.SEMANTIC_JOB_FIELD_THRESHOLD,
+            "keywords_tech_path": cls.KEYWORDS_TECH_PATH,
             "line_filter_enabled": cls.ENABLE_LINE_FILTER,
             "line_filter_config_path": cls.LINE_FILTER_CONFIG_PATH,
             "line_filter_job_keywords": len(cls.LINE_FILTER_JOB_KEYWORDS),
@@ -155,6 +164,15 @@ class Config:
             for key, value in fields.items():
                 if isinstance(value, list):
                     output[str(key)] = [str(v) for v in value]
+        return output
+
+    @classmethod
+    def keywords_tech(cls) -> dict[str, list[str]]:
+        output: dict[str, list[str]] = {}
+        if isinstance(cls._KEYWORDS_TECH, dict):
+            for key, values in cls._KEYWORDS_TECH.items():
+                if isinstance(values, list):
+                    output[str(key)] = [str(v) for v in values]
         return output
 
 
