@@ -91,7 +91,7 @@ class SemanticExtractor:
         embeddings = self.model.encode(
             sentences,
             batch_size=Config.SEMANTIC_BATCH_SIZE,
-            show_progress_bar=False,
+            show_progress_bar=Config.SEMANTIC_SHOW_PROGRESS,
             normalize_embeddings=True,
         )
         return np.asarray(embeddings, dtype=float)

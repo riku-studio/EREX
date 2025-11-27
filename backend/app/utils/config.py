@@ -77,6 +77,7 @@ class Config:
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
     SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "cpu")
     SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
+    SEMANTIC_SHOW_PROGRESS = os.getenv("SEMANTIC_SHOW_PROGRESS", "false").lower() == "true"
     SEMANTIC_TEMPLATES_PATH = os.getenv("SEMANTIC_TEMPLATES_PATH", _default_semantic_templates_path())
     _SEMANTIC_TEMPLATES = _load_json(SEMANTIC_TEMPLATES_PATH)
     SEMANTIC_CONTEXT_RADIUS = int(
@@ -120,6 +121,7 @@ class Config:
             "semantic_model": cls.SEMANTIC_MODEL,
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
             "semantic_device": cls.SEMANTIC_DEVICE,
+            "semantic_show_progress": cls.SEMANTIC_SHOW_PROGRESS,
             "semantic_templates_path": cls.SEMANTIC_TEMPLATES_PATH,
             "semantic_context_radius": cls.SEMANTIC_CONTEXT_RADIUS,
             "semantic_global_threshold": cls.SEMANTIC_JOB_GLOBAL_THRESHOLD,
