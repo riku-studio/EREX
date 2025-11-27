@@ -149,6 +149,7 @@ def tech_insight(payload: TechInsightRequest):
         f"with a ratio of {payload.ratio:.2%} relative to all blocks. "
         "Describe what this technology is and its typical use cases. "
         "Keep it under 100 words. If applicable, mention how common it is implied by the ratio."
+        "Provide the explanation in Japanese."
     )
     if payload.category:
         prompt += f" Category hint: {payload.category}."
