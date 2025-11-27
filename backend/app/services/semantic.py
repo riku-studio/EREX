@@ -199,9 +199,37 @@ class SemanticExtractor:
                 line_scores=[float(v) for v in line_scores],
             )
 
-        start_line = min(body_segments[i].start for i in hits)
-        end_line = max(body_segments[i].end for i in hits)
-        matched_scores = [float(body_scores[i]) for i in hits]
+        clusters: List[tuple[int, int, List[float]]] = []
+        current: List[int] = []
+        for idx in hits:
+            if not current:
+                current.append(idx)
+                continue
+            prev_idx = current[-1]
+            prev_segment = body_segments[prev_idx]
+            curr_segment = body_segments[idx]
+            if curr_segment.start <= prev_segment.end + 1:
+                current.append(idx)
+            else:
+                clusters.append(
+                    (
+                        min(body_segments[i].start for i in current),
+                        max(body_segments[i].end for i in current),
+                        [float(body_scores[i]) for i in current],
+                    )
+                )
+                current = [idx]
+        if current:
+            clusters.append(
+                (
+                    min(body_segments[i].start for i in current),
+                    max(body_segments[i].end for i in current),
+                    [float(body_scores[i]) for i in current],
+                )
+            )
+
+        best_cluster = max(clusters, key=lambda item: float(np.mean(item[2]) if item[2] else 0.0))
+        start_line, end_line, matched_scores = best_cluster
         segment_text = "\n".join(lines[start_line : end_line + 1]).strip()
 
         return SemanticResult(

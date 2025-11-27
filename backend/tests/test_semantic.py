@@ -91,3 +91,36 @@ def test_extract_batch_returns_results_per_body():
     assert len(results) == 2
     assert results[0] is not None and results[0].matched is True
     assert results[1] is not None and results[1].matched is False
+
+
+def test_best_contiguous_cluster_is_chosen():
+    class WeightedModel:
+        def encode(self, sentences, **kwargs):
+            vectors = []
+            for s in sentences:
+                if "hitA" in s:
+                    vectors.append(np.array([1.0, 0.0]))
+                elif "hitB" in s:
+                    vectors.append(np.array([0.6, 0.0]))
+                elif "GLOBAL" in s:
+                    vectors.append(np.array([1.0, 0.0]))
+                else:
+                    vectors.append(np.array([0.0, 0.0]))
+            return vectors
+
+    body = "hitA one\nnoise line\nhitB two"
+    extractor = SemanticExtractor(
+        model=WeightedModel(),
+        global_templates=["GLOBAL"],
+        global_threshold=0.5,
+        context_radius=0,
+        field_templates={},
+    )
+
+    result = extractor.extract(body)
+
+    assert result is not None
+    assert result.matched is True
+    assert result.text == "hitA one"
+    assert result.start_line == 0
+    assert result.end_line == 0
