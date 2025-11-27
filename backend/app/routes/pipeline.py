@@ -184,7 +184,7 @@ def tech_insight(payload: TechInsightRequest):
             messages=[{"role": "user", "content": prompt}],
             max_tokens=200,
         )
-        insight = completion.choices[0].message.content
+        insight = completion.choices[0].message.content or ""
     except Exception as exc:  # pragma: no cover - network/dep issues
         logger.error("OpenAI request failed: %s", exc)
         fallback = (
@@ -194,5 +194,12 @@ def tech_insight(payload: TechInsightRequest):
         if payload.category:
             fallback += f", category={payload.category}"
         return TechInsightResponse(keyword=payload.keyword, insight=fallback)
+
+    if not insight.strip():
+        insight = (
+            f"{payload.keyword}: tech insight unavailable (empty response). "
+            f"Count={payload.count}, ratio={payload.ratio:.2%}"
+            + (f", category={payload.category}" if payload.category else "")
+        )
 
     return TechInsightResponse(keyword=payload.keyword, insight=insight)
