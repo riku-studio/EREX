@@ -18,8 +18,8 @@ from app.utils.logging import logger
 class PipelineResult:
     source_path: str
     subject: str
-    blocks: List[SplitBlock]
     aggregation: Dict[str, object]
+    blocks: List[SplitBlock]
 
 
 class Pipeline:

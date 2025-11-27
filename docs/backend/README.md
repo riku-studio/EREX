@@ -2,10 +2,10 @@
 
 ## 目录约定
 - `app/main.py`：应用入口，注册路由与中间件。
-- `app/routes/`：路由层（当前包含 `health`、`index_rules`）。
+- `app/routes/`：路由层（`health`、`index_rules`、`pipeline`）。
 - `app/utils/`：配置与日志工具（`Config` 读取 `.env`，日志输出 stdout）。
 - `app/core/`：预留公共依赖、异常处理、中间件。
-- `app/models/` / `app/services/`：预留数据模型与业务服务实现；`services/index_rules.py` 支持文件/数据库双源读取索引规则并向 Pipeline 提供统一接口（Pipeline 不感知来源）。
+- `app/models/` / `app/services/`：业务服务实现；`services/index_rules.py` 支持文件/数据库双源读取索引规则；pipeline 相关模块位于 `services/`（cleaner/line_filter/semantic/splitter/extractor/classifier/aggregator/pipeline）。
 
 ## 运行方式
 - 本地直接运行：`cd backend && uv run uvicorn app.main:app --reload --port 8000`（仅容器内暴露，dev 由前端/反代访问）。
@@ -14,6 +14,7 @@
 ## 配置
 - 读取根层 `.env`（模板 `.env.example`）；常用键：`APP_ENV`、`PORT`、`DB_HOST/PORT/USER/PASS/NAME`、日志开关。
 - 索引规则来源：`INDEX_RULE_SOURCE=file|db`（默认 file），`INDEX_RULES_PATH`（文件路径，默认 `backend/config/index_rules.json`），`INDEX_RULE_TABLE`（数据库模式下的表名）。
+- pipeline 相关：`PIPELINE_STEPS` 控制启用顺序；`SEMANTIC_TEMPLATES_PATH`、`LINE_FILTER_CONFIG_PATH`、`KEYWORDS_TECH_PATH`、`CLASSIFIER_FOREIGNER_PATH` 等指向配置文件；`SEMANTIC_SHOW_PROGRESS` 可显示模型编码进度条。
 - 数据库仅在 `INDEX_RULE_SOURCE=db` 时需要；镜像内已包含 `asyncpg` 以便直接连接，启用数据库时配合 compose `db` profile。
 
 ## 后续扩展建议

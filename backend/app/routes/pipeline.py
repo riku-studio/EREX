@@ -24,6 +24,7 @@ class PipelineConfigResponse(BaseModel):
 
 class PipelineRunResponse(BaseModel):
     results: list
+    summary: dict
 
 
 class FileUploadResponse(BaseModel):
@@ -95,17 +96,19 @@ def run_pipeline():
     results = pipeline.process_messages(contents)
 
     serialized: list = []
+    all_blocks = []
     for res in results:
-        aggregated = res.aggregation
         serialized.append(
             {
                 "source_path": res.source_path,
                 "subject": res.subject,
-                "blocks": [
-                    {"text": b.text, "start_line": b.start_line, "end_line": b.end_line}
-                    for b in res.blocks
-                ],
-                "aggregation": aggregated,
+                "aggregation": res.aggregation,
             }
         )
-    return PipelineRunResponse(results=serialized)
+        all_blocks.extend(res.blocks)
+
+    # Overall summary across all messages
+    overall = pipeline.aggregator.aggregate_blocks(all_blocks) if pipeline.aggregator else {}
+    overall["message_count"] = len(results)
+
+    return PipelineRunResponse(results=serialized, summary=overall)
