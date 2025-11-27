@@ -87,7 +87,7 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, re
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
               <h3 className="text-lg font-semibold text-slate-800 mb-4">Top Keywords</h3>
               <div className="space-y-6">
-                {Object.entries(results.summary.keyword_summary).slice(0, 2).map(([category, keywords]) => (
+                {Object.entries(results.summary.keyword_summary).map(([category, keywords]) => (
                   <div key={category}>
                     <p className="text-xs font-bold text-slate-500 uppercase mb-2">{category}</p>
                     <KeywordChart 

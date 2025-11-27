@@ -50,7 +50,12 @@ interface ClassChartProps {
   data: Record<string, ClassStat>;
 }
 
-const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#6366f1'];
+const CLASS_COLOR_MAP: Record<string, string> = {
+  ok: '#10b981', // green
+  ng: '#ef4444', // red
+  unknown: '#94a3b8', // gray
+};
+const FALLBACK_COLORS = ['#0ea5e9', '#f59e0b', '#6366f1', '#8b5cf6'];
 
 export const ClassChart: React.FC<ClassChartProps> = ({ data }) => {
   const chartData = Object.entries(data).map(([key, stat]: [string, ClassStat]) => ({
@@ -72,7 +77,10 @@ export const ClassChart: React.FC<ClassChartProps> = ({ data }) => {
           dataKey="value"
         >
           {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            <Cell 
+              key={`cell-${index}`} 
+              fill={CLASS_COLOR_MAP[entry.name.toLowerCase()] || FALLBACK_COLORS[index % FALLBACK_COLORS.length]} 
+            />
           ))}
         </Pie>
         <Tooltip 

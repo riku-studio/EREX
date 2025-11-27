@@ -118,6 +118,8 @@ def run_pipeline():
     overall = pipeline.aggregator.aggregate_blocks(all_blocks) if pipeline.aggregator else {}
     overall["message_count"] = len(results)
 
+    logger.info("Pipeline summary: %s", overall)
+
     return PipelineRunResponse(results=serialized, summary=overall)
 
 
