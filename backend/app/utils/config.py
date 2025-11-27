@@ -118,7 +118,7 @@ class Config:
 
     # Classifier configs (can be extended)
     CLASSIFIER_FOREIGNER_PATH = os.getenv(
-        "CLASSIFIER_FOREIGNER_PATH", str(PROJECT_ROOT / "backend" / "config" / "classifiers" / "foreigner.json")
+        "CLASSIFIER_FOREIGNER_PATH", str(CONFIG_ROOT / "classifiers" / "foreigner.json")
     )
 
     # Splitter (multi-block detection)
