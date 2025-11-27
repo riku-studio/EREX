@@ -9,7 +9,7 @@
 
 ## 运行方式
 - 本地直接运行：`cd backend && uv run uvicorn app.main:app --reload --port 8000`（仅容器内暴露，dev 由前端/反代访问）。
-- 容器化：默认文件模式 `cd infra && docker compose up --build`；若启用数据库索引规则，执行 `docker compose --profile db up --build` 以启动 PostgreSQL。
+- 容器化：`cd infra && docker compose up --build`（前后端全栈，后端 8000、前端 3000 映射到本机）；开发模式可用 `docker-compose.dev.yml`。
 
 ## 配置
 - 读取根层 `.env`（模板 `.env.example`）；常用键：`APP_ENV`、`PORT`、`DB_HOST/PORT/USER/PASS/NAME`、日志开关。

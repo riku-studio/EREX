@@ -11,12 +11,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends pst-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制项目文件
+# 复制依赖并安装
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
+
+# 复制源码与配置
 COPY ./app ./app
 COPY ./config ./config
-COPY .env.example .env
 
-# 启动命令
+# 启动命令（生产模式）
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

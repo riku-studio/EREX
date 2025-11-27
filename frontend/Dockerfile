@@ -1,7 +1,18 @@
-FROM nginx:alpine
+FROM node:20-alpine AS build
+WORKDIR /app
 
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+# Vite 注入以 VITE_ 开头的环境变量；可在构建时通过 --build-arg VITE_API_BASE=... 覆盖
+ARG VITE_API_BASE=http://localhost:8000
+ENV VITE_API_BASE=${VITE_API_BASE}
+RUN npm run build
+
+FROM nginx:alpine
 WORKDIR /usr/share/nginx/html
-COPY public/ .
+COPY --from=build /app/dist .
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

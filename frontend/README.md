@@ -1,9 +1,39 @@
-# EREX Frontend
+# EREX Frontend (Next.js/React)
 
-当前仅提供占位的静态页面，便于多容器编排与 Nginx 验证。后续请按 React 技术栈替换：
+A modern UI for interacting with the EREX pipeline APIs (upload, run pipeline, inspect summaries, and request tech insights).
 
-1. 使用 Vite/CRA 初始化 React 工程，保留 `frontend/Dockerfile` 作为生产静态服务镜像入口。
-2. 将构建产物输出到 `dist/` 或 `build/`，在 Dockerfile 中 `COPY --from=build` 或直接复制到 `/usr/share/nginx/html`。
-3. 更新 `infra/docker-compose.yml` 中前端服务的构建命令（如需 dev server 则改用 `npm run dev -- --host`）。
+## Prerequisites
+- Node.js 18+
+- Backend running (see `../backend`, endpoints exposed on the same host/port as your env config)
 
-占位页面路径：`frontend/public/index.html`。
+## Setup
+```bash
+cd frontend
+npm install
+```
+
+## Development
+```bash
+npm run dev
+```
+- Default dev server: http://localhost:3000
+- API base URL: configure via env (`VITE_API_BASE`, defaults to same origin). Create `.env.local` if needed:
+  ```bash
+  VITE_API_BASE=http://localhost:8000
+  ```
+
+## Available Scripts
+- `npm run dev` — start dev server
+- `npm run build` — production build
+- `npm run preview` — preview production build
+
+## Backend Endpoints Used
+- `GET /pipeline/config`
+- `POST /pipeline/upload` (multipart files[])
+- `DELETE /pipeline/files`
+- `POST /pipeline/run`
+- `POST /pipeline/tech-insight`
+
+## Notes
+- No external LLM key is required on the frontend; all model calls go through backend (`/pipeline/tech-insight`).
+- Ensure backend `OPENAI_API_KEY` is set when using tech insight; otherwise the UI should display an error from the API.

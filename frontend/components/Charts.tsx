@@ -1,0 +1,85 @@
+import React from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, Legend
+} from 'recharts';
+import { KeywordStat, ClassStat } from '../types';
+
+interface KeywordChartProps {
+  data: KeywordStat[];
+  onBarClick: (data: any) => void;
+}
+
+export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) => {
+  // Sort by count descending
+  const sortedData = [...data].sort((a, b) => b.count - a.count).slice(0, 10);
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart 
+        data={sortedData} 
+        layout="vertical" 
+        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+        <XAxis type="number" hide />
+        <YAxis 
+          dataKey="keyword" 
+          type="category" 
+          width={100} 
+          tick={{fontSize: 12, fill: '#64748b'}} 
+        />
+        <Tooltip 
+          cursor={{fill: '#f1f5f9'}}
+          contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+        />
+        <Bar 
+          dataKey="count" 
+          fill="#0ea5e9" 
+          radius={[0, 4, 4, 0]} 
+          barSize={20}
+          onClick={(data) => onBarClick(data)}
+          className="cursor-pointer hover:opacity-80 transition-opacity"
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+};
+
+interface ClassChartProps {
+  data: Record<string, ClassStat>;
+}
+
+const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#6366f1'];
+
+export const ClassChart: React.FC<ClassChartProps> = ({ data }) => {
+  const chartData = Object.entries(data).map(([key, stat]: [string, ClassStat]) => ({
+    name: key.toUpperCase(),
+    value: stat.count,
+    ratio: stat.ratio
+  }));
+
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <PieChart>
+        <Pie
+          data={chartData}
+          cx="50%"
+          cy="50%"
+          innerRadius={60}
+          outerRadius={80}
+          paddingAngle={5}
+          dataKey="value"
+        >
+          {chartData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip 
+             contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+        />
+        <Legend verticalAlign="bottom" height={36}/>
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};

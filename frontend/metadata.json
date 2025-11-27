@@ -1,0 +1,5 @@
+{
+  "name": "EREX Pipeline UI",
+  "description": "A modern interface for the EREX email processing pipeline, featuring configuration management, file operations, and analytical visualizations.",
+  "requestFramePermissions": []
+}
