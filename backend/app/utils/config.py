@@ -13,9 +13,18 @@ except ModuleNotFoundError:
 load_dotenv()
 
 
-# 当前项目根目录（backend/app/utils/../../.. -> repo 根）
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
+# 当前项目根目录（兼容容器路径 /app/app/utils 与本地路径 backend/app/utils）
+def _detect_project_root() -> Path:
+    base = Path(__file__).resolve()
+    for candidate in base.parents:
+        if (candidate / "backend").exists():
+            return candidate
+    # fallback: /app 级别
+    return base.parents[2]
+
+
+PROJECT_ROOT = _detect_project_root()
+BACKEND_ROOT = PROJECT_ROOT / "backend"
 
 
 def _default_index_rules_path() -> str:
