@@ -90,6 +90,13 @@ class Config:
         os.getenv("SEMANTIC_JOB_FIELD_THRESHOLD", _SEMANTIC_TEMPLATES.get("field_threshold", 0.4))
     )
 
+    # Splitter (multi-block detection)
+    SPLITTER_SKIP_LINES = int(os.getenv("SPLITTER_SKIP_LINES", 5))
+    SPLITTER_MARKER_PATTERNS = [
+        r"^[\s\W]*案件名[\s\W]*$",
+        r"^[\s\W]*案件[\s\W]*$",
+    ]
+
     # Lightweight line filter (between cleaner and semantic)
     ENABLE_LINE_FILTER = os.getenv("ENABLE_LINE_FILTER", "true").lower() == "true"
     LINE_FILTER_CONFIG_PATH = os.getenv("LINE_FILTER_CONFIG_PATH", _default_line_filter_config_path())
