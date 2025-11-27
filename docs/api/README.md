@@ -9,11 +9,11 @@
 - `GET /pipeline/config`：查看当前 pipeline 配置与步骤。
 - `POST /pipeline/upload`：上传 `pst/eml/msg` 到 `data/` 目录。
 - `DELETE /pipeline/files`：删除 `data/` 中指定文件。
-- `POST /pipeline/run`：执行 pipeline（cleaner → line_filter → semantic → splitter → extractor → classifier → aggregator），返回每封邮件聚合结果与总体摘要（邮件数、块数、关键字汇总、分类汇总）。
+- `POST /pipeline/run`：执行 pipeline（cleaner → line_filter → semantic → splitter → extractor → classifier → aggregator），返回每封邮件聚合结果（含 semantic 结果）与总体摘要（邮件数、块数、关键字汇总、分类汇总）。
 
 ## 响应要点
 - `/pipeline/run` 响应：
-  - `results`: 每封邮件 `{source_path, subject, aggregation}`，aggregation 含 `block_count`、`keyword_summary`、`class_summary`（不返回块明细）。
+  - `results`: 每封邮件 `{source_path, subject, semantic, aggregation}`，aggregation 含 `block_count`、`keyword_summary`、`class_summary`（不返回块明细）。
   - `summary`: 总体统计（`message_count`、`block_count`、keyword/class 汇总）。
 - 上传/删除：返回成功的文件列表或删除计数。
 

@@ -7,7 +7,7 @@ from app.services.aggregator import Aggregator
 from app.services.classifier import Classifier
 from app.services.extractor import KeywordExtractor
 from app.services.preprocess import LineFilter
-from app.services.semantic import prepare_semantic_input
+from app.services.semantic import SemanticResult, get_semantic_extractor, prepare_semantic_input
 from app.services.splitter import SplitBlock, Splitter
 from app.services.cleaner import clean_body
 from app.utils.config import Config
@@ -18,6 +18,7 @@ from app.utils.logging import logger
 class PipelineResult:
     source_path: str
     subject: str
+    semantic: Optional[SemanticResult]
     aggregation: Dict[str, object]
     blocks: List[SplitBlock]
 
@@ -35,6 +36,7 @@ class Pipeline:
         self.classifier = (
             Classifier(config.CLASSIFIER_FOREIGNER_PATH, config) if "classifier" in self.steps else None
         )
+        self.semantic_extractor = get_semantic_extractor() if "semantic" in self.steps else None
         self.aggregator = Aggregator(
             keyword_extractor=self.keyword_extractor if "extractor" in self.steps else None,
             classifier=self.classifier if "classifier" in self.steps else None,
@@ -51,11 +53,21 @@ class Pipeline:
             return [SplitBlock(text=cleaned, start_line=0, end_line=len(cleaned.splitlines()) - 1)] if cleaned else []
         return self.splitter.split(body)
 
+    def _semantic(self, body: str) -> Optional[SemanticResult]:
+        if not self.semantic_extractor:
+            return None
+        try:
+            return self.semantic_extractor.extract(body)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error("Semantic extractor failed: %s", exc)
+            return None
+
     def process_message(self, message) -> PipelineResult:
         logger.info("Pipeline running for %s with steps=%s", getattr(message, "source_path", ""), self.steps)
 
         body_clean = clean_body(message) if "cleaner" in self.steps else getattr(message, "body", "")
         body_filtered = self._apply_line_filter(body_clean)
+        semantic_result = self._semantic(body_filtered)
         blocks = self._split(body_filtered)
 
         aggregation = (
@@ -65,6 +77,7 @@ class Pipeline:
         return PipelineResult(
             source_path=getattr(message, "source_path", ""),
             subject=getattr(message, "subject", ""),
+            semantic=semantic_result,
             blocks=blocks,
             aggregation=aggregation,
         )

@@ -4,7 +4,7 @@
 - 原始邮件 -> parser（`app/services/email_parser.py`） -> cleaner（`app/services/cleaner.py`） -> line_filter（`app/services/preprocess/line_filter.py`） -> semantic（`app/services/semantic.py`） -> splitter（`app/services/splitter.py`） -> extractor（`app/services/extractor.py`） -> classifier（`app/services/classifier.py`） -> aggregator（`app/services/aggregator.py`）。
 - cleaner：去除 HTML、压缩空白并保持换行。
 - line_filter：轻量负向过滤，只删除明确垃圾行；命中招聘关键词（配置 `LINE_FILTER_JOB_KEYWORDS`）则保留。
-- semantic：按行构造上下文 segment（行 ± `context_radius`），基于多模板（global + fields）一次性 embedding 做相似度筛选，模板与阈值来自 `backend/config/semantic_job_templates.json`。
+- semantic：按行构造上下文 segment（行 ± `context_radius`），基于多模板（global + fields）一次性 embedding 做相似度筛选，模板与阈值来自 `backend/config/semantic_job_templates.json`，结果返回在 `/pipeline/run` 的 `semantic` 字段。
 - splitter：按“案件/案件名”独立行切分，一封邮件内可拆出多个招聘块（默认跳过首尾 5 行的标记）。
 - extractor：从配置化技术关键字（`backend/config/keywords_tech.json`）提取并汇总出现次数/比例（块内去重）。
 - classifier：示例 `foreigner` 分类器（`backend/config/classifiers/foreigner.json`）基于正则判断可/不可；可扩展其他分类。

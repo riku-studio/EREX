@@ -102,6 +102,7 @@ def run_pipeline():
             {
                 "source_path": res.source_path,
                 "subject": res.subject,
+                "semantic": res.semantic,
                 "aggregation": res.aggregation,
             }
         )
