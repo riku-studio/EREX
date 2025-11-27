@@ -76,6 +76,10 @@ class Config:
     LOG_FORMAT = os.getenv("LOG_FORMAT", "plain")
     LOG_TO_FILE = os.getenv("LOG_TO_FILE", "false").lower() == "true"
 
+    # OpenAI
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
     # Semantic (template-based) extraction
     SEMANTIC_MODEL = os.getenv("SEMANTIC_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
@@ -148,6 +152,7 @@ class Config:
             "log_level": cls.LOG_LEVEL,
             "log_format": cls.LOG_FORMAT,
             "log_to_file": cls.LOG_TO_FILE,
+            "openai_model": cls.OPENAI_MODEL,
             "semantic_model": cls.SEMANTIC_MODEL,
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
             "semantic_device": cls.SEMANTIC_DEVICE,

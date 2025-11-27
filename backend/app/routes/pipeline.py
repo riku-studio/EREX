@@ -11,6 +11,7 @@ from app.services.email_parser import parse_directory, parse_email_file
 from app.services.pipeline import Pipeline
 from app.utils.config import Config, PROJECT_ROOT
 from app.utils.logging import logger
+from app.utils.openai_client import get_openai_client
 
 
 DATA_DIR = PROJECT_ROOT / "data"
@@ -113,3 +114,57 @@ def run_pipeline():
     overall["message_count"] = len(results)
 
     return PipelineRunResponse(results=serialized, summary=overall)
+
+
+class TechInsightRequest(BaseModel):
+    keyword: str
+    count: int
+    ratio: float
+    category: str | None = None
+
+
+class TechInsightResponse(BaseModel):
+    keyword: str
+    insight: str
+
+
+@router.post("/tech-insight", response_model=TechInsightResponse)
+def tech_insight(payload: TechInsightRequest):
+    if not Config.OPENAI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OPENAI_API_KEY is not configured on the server.",
+        )
+
+    client = get_openai_client()
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OpenAI client unavailable (missing dependency?).",
+        )
+
+    prompt = (
+        "You are a concise tech explainer for a recruitment analytics dashboard. "
+        f"The keyword '{payload.keyword}' appeared in {payload.count} blocks "
+        f"with a ratio of {payload.ratio:.2%} relative to all blocks. "
+        "Describe what this technology is and its typical use cases. "
+        "Keep it under 100 words. If applicable, mention how common it is implied by the ratio."
+    )
+    if payload.category:
+        prompt += f" Category hint: {payload.category}."
+
+    try:
+        completion = client.responses.create(
+            model=Config.OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_output_tokens=200,
+        )
+        insight = completion.output_text
+    except Exception as exc:  # pragma: no cover - network/dep issues
+        logger.error("OpenAI request failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OpenAI request failed: {exc}",
+        ) from exc
+
+    return TechInsightResponse(keyword=payload.keyword, insight=insight)
