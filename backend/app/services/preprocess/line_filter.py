@@ -21,6 +21,7 @@ class LineFilter:
         self.job_keywords = list(config.LINE_FILTER_JOB_KEYWORDS)
         self.signature_keywords = list(config.LINE_FILTER_SIGNATURE_KEYWORDS)
         self.company_prefixes = tuple(config.LINE_FILTER_SIGNATURE_COMPANY_PREFIX)
+        self.force_delete_patterns = self._compile_patterns(getattr(config, "LINE_FILTER_FORCE_DELETE_PATTERNS", []))
         self.greeting_patterns = self._compile_patterns(config.LINE_FILTER_GREETING_PATTERNS)
         self.closing_patterns = self._compile_patterns(config.LINE_FILTER_CLOSING_PATTERNS)
         self.footer_patterns = self._compile_patterns(config.LINE_FILTER_FOOTER_PATTERNS)
@@ -32,6 +33,8 @@ class LineFilter:
 
         kept: List[str] = []
         for line in lines:
+            if self._matches_any(self.force_delete_patterns, line):
+                continue
             if self._contains_job_keyword(line):
                 kept.append(line)
                 continue

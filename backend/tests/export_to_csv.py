@@ -9,6 +9,7 @@
 import argparse
 import csv
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -83,6 +84,7 @@ def _rows(
 
 
 def export_to_csv(input_path: Path, output_path: Path, stage: str):
+    start = time.perf_counter()
     contents = _load_messages(input_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -126,6 +128,7 @@ def export_to_csv(input_path: Path, output_path: Path, stage: str):
                 print(f"[progress] 已写入 {idx}/{len(rows)} 条")
             writer.writerow(row)
         print(f"[done] 共导出 {len(rows)} 条记录 -> {output_path}")
+        print(f"[time] 总耗时 {time.perf_counter() - start:.2f}s")
 
 
 def main():

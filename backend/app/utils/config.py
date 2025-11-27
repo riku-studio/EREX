@@ -100,6 +100,7 @@ class Config:
     LINE_FILTER_SIGNATURE_KEYWORDS = _LINE_FILTER_SETTINGS.get("signature_keywords", [])
     LINE_FILTER_FOOTER_PATTERNS = _LINE_FILTER_SETTINGS.get("footer_patterns", [])
     LINE_FILTER_JOB_KEYWORDS = _LINE_FILTER_SETTINGS.get("job_keywords", [])
+    LINE_FILTER_FORCE_DELETE_PATTERNS = _LINE_FILTER_SETTINGS.get("force_delete_patterns", [])
 
     # Index rule source
     INDEX_RULE_SOURCE = os.getenv("INDEX_RULE_SOURCE", "file").lower()

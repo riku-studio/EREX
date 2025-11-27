@@ -34,3 +34,21 @@ def test_filters_decorative_lines():
     lines = ["＝＝＝", "――――――", "スキル: Golang"]
 
     assert line_filter.filter_lines(lines) == ["スキル: Golang"]
+
+
+def test_force_delete_overrides_job_keywords():
+    class ConfigOverride:
+        ENABLE_LINE_FILTER = True
+        LINE_FILTER_DECORATION_CHARS = ""
+        LINE_FILTER_GREETING_PATTERNS = []
+        LINE_FILTER_CLOSING_PATTERNS = []
+        LINE_FILTER_SIGNATURE_COMPANY_PREFIX = []
+        LINE_FILTER_SIGNATURE_KEYWORDS = []
+        LINE_FILTER_FOOTER_PATTERNS = []
+        LINE_FILTER_JOB_KEYWORDS = ["案件"]
+        LINE_FILTER_FORCE_DELETE_PATTERNS = [r".*@.*"]
+
+    line_filter = LineFilter(config=ConfigOverride)
+    lines = ["案件紹介 株式会社example@example.com", "案件情報: A"]
+
+    assert line_filter.filter_lines(lines) == ["案件情報: A"]
