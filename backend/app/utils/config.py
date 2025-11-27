@@ -98,12 +98,27 @@ class Config:
     KEYWORDS_TECH_PATH = os.getenv("KEYWORDS_TECH_PATH", _default_keywords_path())
     _KEYWORDS_TECH = _load_json(KEYWORDS_TECH_PATH)
 
+    # Classifier configs (can be extended)
+    CLASSIFIER_FOREIGNER_PATH = os.getenv(
+        "CLASSIFIER_FOREIGNER_PATH", str(PROJECT_ROOT / "backend" / "config" / "classifiers" / "foreigner.json")
+    )
+
     # Splitter (multi-block detection)
     SPLITTER_SKIP_LINES = int(os.getenv("SPLITTER_SKIP_LINES", 5))
     SPLITTER_MARKER_PATTERNS = [
         r"^[\s\W]*案件名[\s\W]*$",
         r"^[\s\W]*案件[\s\W]*$",
     ]
+
+    # Pipeline orchestration
+    PIPELINE_STEPS = (
+        os.getenv(
+            "PIPELINE_STEPS",
+            "cleaner,line_filter,semantic,splitter,extractor,classifier,aggregator",
+        )
+        .strip()
+        .split(",")
+    )
 
     # Lightweight line filter (between cleaner and semantic)
     ENABLE_LINE_FILTER = os.getenv("ENABLE_LINE_FILTER", "true").lower() == "true"
