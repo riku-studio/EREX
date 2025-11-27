@@ -7,7 +7,10 @@ import {
   TechInsightResponse 
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://backend:8000';
+const API_BASE =
+  import.meta.env.VITE_API_BASE !== undefined
+    ? import.meta.env.VITE_API_BASE
+    : '';
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {

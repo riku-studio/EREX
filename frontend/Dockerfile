@@ -6,7 +6,7 @@ RUN npm ci
 
 COPY . .
 # Vite 注入以 VITE_ 开头的环境变量；可在构建时通过 --build-arg VITE_API_BASE=... 覆盖
-ARG VITE_API_BASE=http://localhost:8000
+ARG VITE_API_BASE=
 ENV VITE_API_BASE=${VITE_API_BASE}
 RUN npm run build
 
