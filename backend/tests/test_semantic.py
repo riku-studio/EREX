@@ -74,3 +74,20 @@ def test_context_radius_expands_scoring_range():
     assert result.start_line == 0
     assert result.end_line == 2
     assert all(score >= 0.5 for score in result.line_scores)
+
+
+def test_extract_batch_returns_results_per_body():
+    bodies = ["intro\nhit line", "no match here"]
+    extractor = SemanticExtractor(
+        model=FakeModel(),
+        global_templates=["GLOBAL"],
+        global_threshold=0.5,
+        context_radius=0,
+        field_templates={},
+    )
+
+    results = extractor.extract_batch(bodies)
+
+    assert len(results) == 2
+    assert results[0] is not None and results[0].matched is True
+    assert results[1] is not None and results[1].matched is False

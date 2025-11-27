@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Dict, List, Optional, Protocol, Sequence
+from typing import Dict, List, Optional, Protocol, Sequence, Tuple
 
 import numpy as np
 
@@ -32,6 +32,7 @@ class Segment:
     text: str
     start: int
     end: int
+    body_index: int
 
 
 @lru_cache(maxsize=1)
@@ -102,8 +103,33 @@ class SemanticExtractor:
             start = max(0, idx - self.context_radius)
             end = min(total - 1, idx + self.context_radius)
             segment_text = "\n".join(lines[start : end + 1])
-            segments.append(Segment(text=segment_text, start=start, end=end))
+            segments.append(Segment(text=segment_text, start=start, end=end, body_index=0))
         return segments
+
+    def _prepare_batch(
+        self, bodies: Sequence[str]
+    ) -> Tuple[List[Segment], List[List[int]], List[List[str]]]:
+        all_segments: List[Segment] = []
+        segment_indices_by_body: List[List[int]] = []
+        lines_per_body: List[List[str]] = []
+
+        for body_index, body in enumerate(bodies):
+            prepared_body = prepare_semantic_input(body, line_filter=self.line_filter)
+            lines = [line for line in prepared_body.splitlines() if line.strip()]
+            lines_per_body.append(lines)
+
+            if not lines:
+                segment_indices_by_body.append([])
+                continue
+
+            segments = self._build_segments(lines)
+            offset = len(all_segments)
+            for seg in segments:
+                seg.body_index = body_index
+                all_segments.append(seg)
+            segment_indices_by_body.append(list(range(offset, offset + len(segments))))
+
+        return all_segments, segment_indices_by_body, lines_per_body
 
     def _compute_global_scores(self, segment_embeddings: np.ndarray) -> np.ndarray:
         if segment_embeddings.size == 0:
@@ -139,16 +165,61 @@ class SemanticExtractor:
                 ", ".join(f"{k}:{v:.3f}" for k, v in max_scores.items()),
             )
 
-    def extract(self, body: str) -> Optional[SemanticResult]:
-        prepared_body = prepare_semantic_input(body, line_filter=self.line_filter)
-        lines = [line for line in prepared_body.splitlines() if line.strip()]
+    def _compute_result_for_body(
+        self,
+        lines: List[str],
+        body_segment_indices: List[int],
+        segments: List[Segment],
+        global_scores: Sequence[float],
+    ) -> Optional[SemanticResult]:
         if not lines:
             return None
+        if not body_segment_indices:
+            return SemanticResult(
+                text="",
+                score=0.0,
+                start_line=None,
+                end_line=None,
+                matched=False,
+                line_scores=[0.0 for _ in lines],
+            )
 
-        segments = self._build_segments(lines)
-        segment_embeddings = self._embed([segment.text for segment in segments])
-        global_scores = self._compute_global_scores(segment_embeddings)
-        line_scores = self._score_lines(len(lines), segments, global_scores)
+        body_segments = [segments[i] for i in body_segment_indices]
+        body_scores = [global_scores[i] for i in body_segment_indices]
+        line_scores = self._score_lines(len(lines), body_segments, body_scores)
+
+        hits = [idx for idx, score in enumerate(body_scores) if score >= self.global_threshold]
+        if not hits:
+            return SemanticResult(
+                text="",
+                score=0.0,
+                start_line=None,
+                end_line=None,
+                matched=False,
+                line_scores=[float(v) for v in line_scores],
+            )
+
+        start_line = min(body_segments[i].start for i in hits)
+        end_line = max(body_segments[i].end for i in hits)
+        matched_scores = [float(body_scores[i]) for i in hits]
+        segment_text = "\n".join(lines[start_line : end_line + 1]).strip()
+
+        return SemanticResult(
+            text=segment_text,
+            score=float(np.mean(matched_scores)) if matched_scores else 0.0,
+            start_line=start_line,
+            end_line=end_line,
+            matched=True,
+            line_scores=[float(v) for v in line_scores],
+        )
+
+    def extract_batch(self, bodies: Sequence[str]) -> List[Optional[SemanticResult]]:
+        segments, segment_indices_by_body, lines_per_body = self._prepare_batch(bodies)
+        if not segments and not any(lines_per_body):
+            return [None for _ in bodies]
+
+        segment_embeddings = self._embed([segment.text for segment in segments]) if segments else np.empty((0, 0))
+        global_scores = self._compute_global_scores(segment_embeddings) if segments else np.asarray([], dtype=float)
 
         top_samples = sorted(
             [(idx, score) for idx, score in enumerate(global_scores)], key=lambda item: item[1], reverse=True
@@ -161,30 +232,15 @@ class SemanticExtractor:
         )
         self._log_field_debug(segment_embeddings)
 
-        hits = np.where(global_scores >= self.global_threshold)[0]
-        if hits.size == 0:
-            return SemanticResult(
-                text="",
-                score=0.0,
-                start_line=None,
-                end_line=None,
-                matched=False,
-                line_scores=[float(v) for v in line_scores],
-            )
+        results: List[Optional[SemanticResult]] = []
+        for body_indices, lines in zip(segment_indices_by_body, lines_per_body):
+            result = self._compute_result_for_body(lines, body_indices, segments, global_scores)
+            results.append(result)
+        return results
 
-        start_line = min(segments[int(i)].start for i in hits)
-        end_line = max(segments[int(i)].end for i in hits)
-        matched_scores = [float(global_scores[int(i)]) for i in hits]
-        segment_text = "\n".join(lines[start_line : end_line + 1]).strip()
-
-        return SemanticResult(
-            text=segment_text,
-            score=float(np.mean(matched_scores)) if matched_scores else 0.0,
-            start_line=start_line,
-            end_line=end_line,
-            matched=True,
-            line_scores=[float(v) for v in line_scores],
-        )
+    def extract(self, body: str) -> Optional[SemanticResult]:
+        results = self.extract_batch([body])
+        return results[0] if results else None
 
 
 def get_semantic_extractor(model: EmbeddingModel | None = None) -> SemanticExtractor:
