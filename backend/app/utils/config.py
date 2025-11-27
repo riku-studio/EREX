@@ -17,22 +17,27 @@ load_dotenv()
 def _detect_project_root() -> Path:
     base = Path(__file__).resolve()
     for candidate in base.parents:
+        # 本地开发：repo 根包含 backend 目录
         if (candidate / "backend").exists():
             return candidate
-    # fallback: /app 级别
+        # 容器内：/app 下有 config 目录
+        if (candidate / "config").exists() and (candidate / "app").exists():
+            return candidate
     return base.parents[2]
 
 
 PROJECT_ROOT = _detect_project_root()
-BACKEND_ROOT = PROJECT_ROOT / "backend"
+BACKEND_ROOT = PROJECT_ROOT / "backend" if (PROJECT_ROOT / "backend").exists() else PROJECT_ROOT
+CONFIG_ROOT = (
+    PROJECT_ROOT / "backend" / "config" if (PROJECT_ROOT / "backend" / "config").exists() else PROJECT_ROOT / "config"
+)
 
 
 def _default_index_rules_path() -> str:
     """Choose a default path for index rules loaded from config files."""
 
     candidates = [
-        PROJECT_ROOT / "backend" / "config" / "index_rules.json",
-        PROJECT_ROOT / "config" / "index_rules.json",
+        CONFIG_ROOT / "index_rules.json",
         BACKEND_ROOT / "config" / "index_rules.json",
     ]
 
@@ -44,15 +49,15 @@ def _default_index_rules_path() -> str:
 
 
 def _default_line_filter_config_path() -> str:
-    return str(PROJECT_ROOT / "backend" / "config" / "line_filter.json")
+    return str(CONFIG_ROOT / "line_filter.json")
 
 
 def _default_semantic_templates_path() -> str:
-    return str(PROJECT_ROOT / "backend" / "config" / "semantic_job_templates.json")
+    return str(CONFIG_ROOT / "semantic_job_templates.json")
 
 
 def _default_keywords_path() -> str:
-    return str(PROJECT_ROOT / "backend" / "config" / "keywords_tech.json")
+    return str(CONFIG_ROOT / "keywords_tech.json")
 
 
 def _load_json(path: str) -> dict:
