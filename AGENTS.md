@@ -22,6 +22,6 @@ Follow Conventional Commits (`feat: add health check`, `chore: bump deps`) with 
 Keep `.env` files local only; rely on defaults in `Config` or pass secrets via orchestration. When enabling `LOG_TO_FILE=true`, confirm `logs/` stays writable yet untracked. Validate new settings via `Config.summary()` in tests to ensure unsafe defaults never reach production.
 
 ## Agent Runtime Notes
-- 运行测试请使用 `uv run pytest ...`，保持与项目工具链一致。
-- 对外总结需使用中文描述；内部思考可使用英文。
-- 代码修改完成后请自动提交到仓库。
+- Please use `uv run pytest ...` to run tests, keeping consistent with the project toolchain.
+- Use Chinese for external summaries; internal thoughts can be in English.
+- After code modifications are complete, please automatically commit them to the repository.

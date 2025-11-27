@@ -14,6 +14,7 @@
 
 ## 配置项（`app/utils/config.py`）
 - `ENABLE_LINE_FILTER`: 是否启用轻量过滤。
+- `LINE_FILTER_CONFIG_PATH`: 配置文件路径，默认 `backend/config/line_filter.json`。
 - `LINE_FILTER_DECORATION_CHARS`: 视为装饰的字符集合。
 - `LINE_FILTER_GREETING_PATTERNS` / `LINE_FILTER_CLOSING_PATTERNS`: 问候与结尾的正则模式。
 - `LINE_FILTER_SIGNATURE_COMPANY_PREFIX`: 判定为公司抬头的前缀列表。
