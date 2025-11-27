@@ -7,6 +7,7 @@ from typing import List, Optional, Protocol, Sequence
 
 import numpy as np
 
+from app.services.preprocess import LineFilter
 from app.utils.config import Config
 from app.utils.logging import logger
 
@@ -47,6 +48,14 @@ def split_to_sentences(text: str) -> List[str]:
     return [p for p in parts if p]
 
 
+def prepare_semantic_input(body: str, line_filter: LineFilter | None = None) -> str:
+    """Apply lightweight line filtering before semantic extraction."""
+    active_filter = line_filter or LineFilter()
+    lines = body.splitlines()
+    filtered_lines = active_filter.filter_lines(lines)
+    return "\n".join(filtered_lines)
+
+
 @dataclass
 class SemanticResult:
     text: str
@@ -58,9 +67,16 @@ class SemanticResult:
 
 
 class SemanticExtractor:
-    def __init__(self, model: EmbeddingModel, template: str, threshold: float):
+    def __init__(
+        self,
+        model: EmbeddingModel,
+        template: str,
+        threshold: float,
+        line_filter: LineFilter | None = None,
+    ):
         self.model = model
         self.threshold = threshold
+        self.line_filter = line_filter
         self.template_embedding = self._embed([template])[0]
 
     def _embed(self, sentences: Sequence[str]) -> np.ndarray:
@@ -73,7 +89,8 @@ class SemanticExtractor:
         return np.asarray(embeddings, dtype=float)
 
     def extract(self, body: str) -> Optional[SemanticResult]:
-        sentences = split_to_sentences(body)
+        prepared_body = prepare_semantic_input(body, line_filter=self.line_filter)
+        sentences = split_to_sentences(prepared_body)
         if not sentences:
             return None
 
@@ -119,4 +136,5 @@ def get_semantic_extractor(model: EmbeddingModel | None = None) -> SemanticExtra
         model=active_model,
         template=JOB_TEMPLATE,
         threshold=Config.SEMANTIC_THRESHOLD,
+        line_filter=LineFilter(),
     )
