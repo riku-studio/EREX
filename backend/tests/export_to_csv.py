@@ -41,19 +41,25 @@ def _rows(
     line_filter: Optional[LineFilter],
     extractor: Optional[SemanticExtractor],
 ):
+    prepared: List[tuple[EmailContent, str, str, int | str]] = []
     for item in contents:
         body_clean = clean_body(item)
         lines = body_clean.splitlines()
         if stage == "clean":
             body_filtered = body_clean
-            filtered_lines = lines
+            removed: int | str = ""
         else:
             body_filtered = prepare_semantic_input(body_clean, line_filter=line_filter)
             filtered_lines = body_filtered.splitlines()
-        removed = len(lines) - len(filtered_lines) if stage != "clean" else ""
-        semantic_input = body_clean if stage == "semantic" else body_filtered
-        semantic = extractor.extract(semantic_input) if stage == "semantic" and extractor else None
+            removed = len(lines) - len(filtered_lines)
+        prepared.append((item, body_clean, body_filtered, removed))
 
+    if stage == "semantic" and extractor:
+        semantics = extractor.extract_batch([body_clean for _, body_clean, _, _ in prepared])
+    else:
+        semantics = [None for _ in prepared]
+
+    for (item, body_clean, body_filtered, removed), semantic in zip(prepared, semantics):
         yield {
             "source_path": item.source_path,
             "subject": item.subject,
