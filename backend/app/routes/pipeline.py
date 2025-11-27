@@ -145,25 +145,32 @@ class TechInsightResponse(BaseModel):
 
 @router.post("/tech-insight", response_model=TechInsightResponse)
 def tech_insight(payload: TechInsightRequest):
+    # Graceful fallback when OpenAI is not configured or unavailable.
     if not Config.OPENAI_API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OPENAI_API_KEY is not configured on the server.",
+        fallback = (
+            f"{payload.keyword}: tech insight unavailable (no OpenAI key). "
+            f"Count={payload.count}, ratio={payload.ratio:.2%}"
         )
+        if payload.category:
+            fallback += f", category={payload.category}"
+        return TechInsightResponse(keyword=payload.keyword, insight=fallback)
 
     client = get_openai_client()
     if client is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OpenAI client unavailable (missing dependency?).",
+        fallback = (
+            f"{payload.keyword}: tech insight unavailable (OpenAI client missing). "
+            f"Count={payload.count}, ratio={payload.ratio:.2%}"
         )
+        if payload.category:
+            fallback += f", category={payload.category}"
+        return TechInsightResponse(keyword=payload.keyword, insight=fallback)
 
     prompt = (
         "You are a concise tech explainer for a recruitment analytics dashboard. "
         f"The keyword '{payload.keyword}' appeared in {payload.count} blocks "
         f"with a ratio of {payload.ratio:.2%} relative to all blocks. "
         "Describe what this technology is and its typical use cases. "
-        "Keep it under 100 words. If applicable, mention how common it is implied by the ratio."
+        "Keep it under 100 words. If applicable, mention how common it is implied by the ratio. "
         "Provide the explanation in Japanese."
     )
     if payload.category:
@@ -178,9 +185,12 @@ def tech_insight(payload: TechInsightRequest):
         insight = completion.output_text
     except Exception as exc:  # pragma: no cover - network/dep issues
         logger.error("OpenAI request failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"OpenAI request failed: {exc}",
-        ) from exc
+        fallback = (
+            f"{payload.keyword}: tech insight unavailable (OpenAI request failed). "
+            f"Count={payload.count}, ratio={payload.ratio:.2%}"
+        )
+        if payload.category:
+            fallback += f", category={payload.category}"
+        return TechInsightResponse(keyword=payload.keyword, insight=fallback)
 
     return TechInsightResponse(keyword=payload.keyword, insight=insight)

@@ -83,4 +83,39 @@ class Pipeline:
         )
 
     def process_messages(self, messages: Sequence) -> List[PipelineResult]:
-        return [self.process_message(msg) for msg in messages]
+        # Preprocess all messages to batch semantic extraction
+        prepared: List[dict] = []
+        for msg in messages:
+            body_clean = clean_body(msg) if "cleaner" in self.steps else getattr(msg, "body", "")
+            body_filtered = self._apply_line_filter(body_clean)
+            prepared.append(
+                {
+                    "message": msg,
+                    "body_filtered": body_filtered,
+                }
+            )
+
+        semantic_results: List[SemanticResult | None] = []
+        if self.semantic_extractor:
+            semantic_results = self.semantic_extractor.extract_batch([p["body_filtered"] for p in prepared])
+        else:
+            semantic_results = [None for _ in prepared]
+
+        results: List[PipelineResult] = []
+        for item, semantic_result in zip(prepared, semantic_results):
+            msg = item["message"]
+            body_filtered = item["body_filtered"]
+            blocks = self._split(body_filtered)
+            aggregation = (
+                self.aggregator.aggregate_blocks(blocks) if "aggregator" in self.steps else {"blocks": [], "summary": {}}
+            )
+            results.append(
+                PipelineResult(
+                    source_path=getattr(msg, "source_path", ""),
+                    subject=getattr(msg, "subject", ""),
+                    semantic=semantic_result,
+                    blocks=blocks,
+                    aggregation=aggregation,
+                )
+            )
+        return results
