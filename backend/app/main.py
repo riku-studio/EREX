@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routes import health, index_rules
+from app.routes import health, index_rules, pipeline
 from app.utils.config import Config
 from app.utils.logging import logger
 
@@ -20,6 +20,7 @@ async def read_root():
 
 app.include_router(health.router)
 app.include_router(index_rules.router)
+app.include_router(pipeline.router)
 
 if __name__ == "__main__":
     import uvicorn
