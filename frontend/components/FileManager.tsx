@@ -113,9 +113,9 @@ export const FileManager: React.FC<FileManagerProps> = ({ files, isUploading, on
             <p className="text-lg font-medium text-slate-700">
               Drag & drop files here
             </p>
-            <p className="text-sm text-slate-500 mt-1">
-              or <button onClick={() => inputRef.current?.click()} className="text-brand-600 font-medium hover:underline">browse files</button> on your computer
-            </p>
+              <p className="text-sm text-slate-500 mt-1">
+                or <button onClick={() => inputRef.current?.click()} className="text-brand-600 font-medium hover:underline">browse files</button> on your computer
+              </p>
           </div>
         </div>
 

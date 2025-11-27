@@ -28,9 +28,7 @@ export const api = {
 
   uploadFiles: async (files: File[]): Promise<UploadResponseItem[]> => {
     const formData = new FormData();
-    files.forEach(file => {
-      formData.append('files[]', file);
-    });
+    files.forEach(file => formData.append('files', file));
 
     const res = await fetch(`${API_BASE}/pipeline/upload`, {
       method: 'POST',

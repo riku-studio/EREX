@@ -54,7 +54,7 @@ def get_pipeline_config():
 
 
 @router.post("/upload", response_model=List[FileUploadResponse])
-async def upload_files(files: List[UploadFile] = File(...)):
+async def upload_files(files: List[UploadFile] = File(description="files[] upload; use field name 'files' or 'files[]'")):
     data_dir = _ensure_data_dir()
     responses: List[FileUploadResponse] = []
     for file in files:
