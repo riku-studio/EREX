@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Sequence, Set
+from typing import Dict, List, Sequence, Set
 
 from app.utils.config import Config
 
@@ -75,3 +75,28 @@ class KeywordExtractor:
             unique = {m.keyword for m in matched}
             counter.update(unique)
         return counter
+
+    def count_by_category(self, blocks: Sequence[str]) -> Dict[str, Counter]:
+        categories: Dict[str, Counter] = {}
+        for block in blocks:
+            matched = self.extract_keywords(block)
+            unique = {m.keyword for m in matched}
+            for keyword in unique:
+                category = self.keyword_to_category.get(keyword.lower(), "unknown")
+                categories.setdefault(category, Counter())[keyword] += 1
+        return categories
+
+    def summarize(self, blocks: Sequence[str]) -> Dict[str, List[Dict[str, float]]]:
+        total_blocks = len(blocks)
+        if total_blocks == 0:
+            return {}
+
+        summary: Dict[str, List[Dict[str, float]]] = {}
+        category_counts = self.count_by_category(blocks)
+        for category, counter in category_counts.items():
+            items: List[Dict[str, float]] = []
+            for keyword, count in counter.most_common():
+                ratio = count / total_blocks
+                items.append({"keyword": keyword, "count": count, "ratio": ratio})
+            summary[category] = items
+        return summary

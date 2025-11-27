@@ -20,3 +20,18 @@ def test_count_by_keyword_counts_once_per_block():
 
     assert counts["Python"] == 2  # first and second block
     assert counts["Java"] == 1
+
+
+def test_summarize_groups_by_category_with_ratio():
+    extractor = KeywordExtractor()
+    blocks = ["Python Python", "Java and Python", "React", ""]
+    summary = extractor.summarize(blocks)
+
+    total_blocks = len(blocks)
+    assert "programming_languages" in summary
+    py_entry = next(item for item in summary["programming_languages"] if item["keyword"] == "Python")
+    java_entry = next(item for item in summary["programming_languages"] if item["keyword"] == "Java")
+    assert py_entry["count"] == 2
+    assert java_entry["count"] == 1
+    assert py_entry["ratio"] == py_entry["count"] / total_blocks
+    assert "frontend_frameworks" in summary
