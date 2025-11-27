@@ -97,7 +97,6 @@ def export_to_csv(input_path: Path, output_path: Path, stage: str):
         print(f"[warn] 语义模型加载失败，跳过语义列: {exc}", file=sys.stderr)
         extractor = None
 
-    batch_size = 50
     with output_path.open("w", newline="", encoding="utf-8") as fp:
         writer = csv.DictWriter(
             fp,
@@ -123,17 +122,12 @@ def export_to_csv(input_path: Path, output_path: Path, stage: str):
             ],
         )
         writer.writeheader()
-        written = 0
-        total = len(contents)
-        for offset in range(0, total, batch_size):
-            batch = contents[offset : offset + batch_size]
-            rows = list(_rows(batch, stage, line_filter, extractor))
-            for row in rows:
-                written += 1
-                if written % 10 == 0:
-                    print(f"[progress] 已写入 {written}/{total} 条")
-                writer.writerow(row)
-        print(f"[done] 共导出 {total} 条记录 -> {output_path}")
+        rows = list(_rows(contents, stage, line_filter, extractor))
+        for idx, row in enumerate(rows, start=1):
+            if idx % 10 == 0:
+                print(f"[progress] 已写入 {idx}/{len(rows)} 条")
+            writer.writerow(row)
+        print(f"[done] 共导出 {len(rows)} 条记录 -> {output_path}")
         print(f"[time] 总耗时 {time.perf_counter() - start:.2f}s")
 
 
