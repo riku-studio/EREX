@@ -38,6 +38,10 @@ def _default_line_filter_config_path() -> str:
     return str(PROJECT_ROOT / "backend" / "config" / "line_filter.json")
 
 
+def _default_semantic_templates_path() -> str:
+    return str(PROJECT_ROOT / "backend" / "config" / "semantic_job_templates.json")
+
+
 def _load_json(path: str) -> dict:
     try:
         return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -73,6 +77,17 @@ class Config:
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
     SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "cpu")
     SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
+    SEMANTIC_TEMPLATES_PATH = os.getenv("SEMANTIC_TEMPLATES_PATH", _default_semantic_templates_path())
+    _SEMANTIC_TEMPLATES = _load_json(SEMANTIC_TEMPLATES_PATH)
+    SEMANTIC_CONTEXT_RADIUS = int(
+        os.getenv("SEMANTIC_CONTEXT_RADIUS", _SEMANTIC_TEMPLATES.get("context_radius", 1))
+    )
+    SEMANTIC_JOB_GLOBAL_THRESHOLD = float(
+        os.getenv("SEMANTIC_JOB_GLOBAL_THRESHOLD", _SEMANTIC_TEMPLATES.get("global_threshold", 0.55))
+    )
+    SEMANTIC_JOB_FIELD_THRESHOLD = float(
+        os.getenv("SEMANTIC_JOB_FIELD_THRESHOLD", _SEMANTIC_TEMPLATES.get("field_threshold", 0.4))
+    )
 
     # Lightweight line filter (between cleaner and semantic)
     ENABLE_LINE_FILTER = os.getenv("ENABLE_LINE_FILTER", "true").lower() == "true"
@@ -104,6 +119,10 @@ class Config:
             "semantic_model": cls.SEMANTIC_MODEL,
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
             "semantic_device": cls.SEMANTIC_DEVICE,
+            "semantic_templates_path": cls.SEMANTIC_TEMPLATES_PATH,
+            "semantic_context_radius": cls.SEMANTIC_CONTEXT_RADIUS,
+            "semantic_global_threshold": cls.SEMANTIC_JOB_GLOBAL_THRESHOLD,
+            "semantic_field_threshold": cls.SEMANTIC_JOB_FIELD_THRESHOLD,
             "line_filter_enabled": cls.ENABLE_LINE_FILTER,
             "line_filter_config_path": cls.LINE_FILTER_CONFIG_PATH,
             "line_filter_job_keywords": len(cls.LINE_FILTER_JOB_KEYWORDS),
@@ -112,6 +131,21 @@ class Config:
             "index_rules_path": cls.INDEX_RULES_PATH,
             "index_rule_table": cls.INDEX_RULE_TABLE,
         }
+
+    @classmethod
+    def semantic_global_templates(cls) -> list[str]:
+        data = cls._SEMANTIC_TEMPLATES.get("global", [])
+        return list(data) if isinstance(data, list) else []
+
+    @classmethod
+    def semantic_field_templates(cls) -> dict[str, list[str]]:
+        fields = cls._SEMANTIC_TEMPLATES.get("fields", {})
+        output: dict[str, list[str]] = {}
+        if isinstance(fields, dict):
+            for key, value in fields.items():
+                if isinstance(value, list):
+                    output[str(key)] = [str(v) for v in value]
+        return output
 
 
 # 使用方式

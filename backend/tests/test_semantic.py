@@ -1,48 +1,51 @@
 import numpy as np
 
-from app.services.semantic import JOB_TEMPLATE, SemanticExtractor
+from app.services.semantic import SemanticExtractor
 
 
 class FakeModel:
-    def __init__(self):
-        # Encode template once
-        self._templates = {
-            "low": np.array([0.0, 1.0]),  # cosine with template -> 0
-            "high": np.array([1.0, 0.0]),  # cosine with template -> 1
-        }
-
     def encode(self, sentences, **kwargs):
         vectors = []
         for s in sentences:
-            if "match" in s:
-                vectors.append(self._templates["high"])
-            elif s == JOB_TEMPLATE:
-                vectors.append(self._templates["high"])
-            elif "hit" in s:
-                vectors.append(self._templates["high"])
+            if "hit" in s or "GLOBAL" in s:
+                vectors.append(np.array([1.0, 0.0]))
+            elif "field-skill" in s:
+                vectors.append(np.array([0.0, 1.0]))
             else:
-                vectors.append(self._templates["low"])
+                vectors.append(np.array([0.0, 0.0]))
         return vectors
 
 
-def test_extract_picks_contiguous_block():
-    body = "intro line。match line 1。match line 2。other line"
-    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5, template=JOB_TEMPLATE)
+def test_extract_marks_relevant_segments():
+    body = "intro line\nhit line here\ntrailing"
+    extractor = SemanticExtractor(
+        model=FakeModel(),
+        global_templates=["GLOBAL"],
+        global_threshold=0.5,
+        context_radius=0,
+        field_templates={},
+    )
+
     result = extractor.extract(body)
 
     assert result is not None
     assert result.matched is True
-    assert result.text == "match line 1\nmatch line 2"
+    assert result.text == "hit line here"
     assert result.start_line == 1
-    assert result.end_line == 2
-    assert len(result.line_scores) == 4
-    assert result.line_scores[1] >= 0.5
-    assert result.line_scores[2] >= 0.5
+    assert result.end_line == 1
+    assert result.line_scores == [0.0, 1.0, 0.0]
 
 
-def test_extract_returns_none_when_no_match():
+def test_extract_returns_no_match_when_below_threshold():
     body = "foo\nbar\nbaz"
-    extractor = SemanticExtractor(model=FakeModel(), threshold=0.9, template=JOB_TEMPLATE)
+    extractor = SemanticExtractor(
+        model=FakeModel(),
+        global_templates=["GLOBAL"],
+        global_threshold=0.9,
+        context_radius=0,
+        field_templates={},
+    )
+
     result = extractor.extract(body)
 
     assert result is not None
@@ -50,16 +53,24 @@ def test_extract_returns_none_when_no_match():
     assert result.text == ""
     assert result.start_line is None
     assert result.end_line is None
-    assert len(result.line_scores) == 3
+    assert result.line_scores == [0.0, 0.0, 0.0]
 
 
-def test_extract_start_to_last_hit_includes_gap():
-    body = "hit one。mid gap。hit two"
-    extractor = SemanticExtractor(model=FakeModel(), threshold=0.5, template=JOB_TEMPLATE)
+def test_context_radius_expands_scoring_range():
+    body = "first\nhit center\nlast"
+    extractor = SemanticExtractor(
+        model=FakeModel(),
+        global_templates=["GLOBAL"],
+        global_threshold=0.5,
+        context_radius=1,
+        field_templates={},
+    )
+
     result = extractor.extract(body)
 
     assert result is not None
     assert result.matched is True
-    assert result.text == "hit one\nmid gap\nhit two"
+    assert result.text == body
     assert result.start_line == 0
     assert result.end_line == 2
+    assert all(score >= 0.5 for score in result.line_scores)

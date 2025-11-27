@@ -45,13 +45,13 @@ def _rows(
         body_clean = clean_body(item)
         lines = body_clean.splitlines()
         if stage == "clean":
-            filtered_lines = lines
             body_filtered = body_clean
+            filtered_lines = lines
         else:
             body_filtered = prepare_semantic_input(body_clean, line_filter=line_filter)
             filtered_lines = body_filtered.splitlines()
         removed = len(lines) - len(filtered_lines) if stage != "clean" else ""
-        semantic_input = body_clean if stage == "clean" else body_filtered
+        semantic_input = body_clean if stage == "semantic" else body_filtered
         semantic = extractor.extract(semantic_input) if stage == "semantic" and extractor else None
 
         yield {
