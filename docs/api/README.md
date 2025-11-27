@@ -5,6 +5,7 @@
 - `GET /`：根路由示例。
 - `GET /index-rules`：返回索引规则列表。
 - `POST /pipeline/tech-insight`：基于关键字统计（`keyword/count/ratio`）调用 OpenAI 生成简短技术介绍。
+- `GET /pipeline/files`：列出 `data/` 目录下的文件（名称与大小）。
 
 ## Pipeline 配置
 ### `GET /pipeline/config`
@@ -33,6 +34,15 @@
 - 响应 `200`：
   ```json
   {"deleted": 2, "skipped": 0}
+  ```
+
+### `GET /pipeline/files`
+- 响应 `200`：
+  ```json
+  [
+    {"filename": "sample.eml", "size": 12345},
+    {"filename": "sample.msg", "size": 6789}
+  ]
   ```
 
 ## 运行 Pipeline

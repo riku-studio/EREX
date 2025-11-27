@@ -7,7 +7,7 @@ import {
   TechInsightResponse 
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://backend:8000';
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -47,18 +47,9 @@ export const api = {
     return handleResponse<DeleteResponse>(res);
   },
 
-  // Helper to list files - inferred requirement as standard CRUD needs a list
-  // If backend doesn't support GET /pipeline/files, we might need to track locally
-  // For now, we will assume a GET endpoint exists or return empty to handle gracefully
   listFiles: async (): Promise<UploadResponseItem[]> => {
-    try {
-      const res = await fetch(`${API_BASE}/pipeline/files`); // Hypothesized endpoint
-      if (res.ok) return res.json();
-      return [];
-    } catch (e) {
-      console.warn("Could not list files, might not be supported by API");
-      return [];
-    }
+    const res = await fetch(`${API_BASE}/pipeline/files`);
+    return handleResponse<UploadResponseItem[]>(res);
   },
 
   runPipeline: async (): Promise<RunResponse> => {

@@ -68,10 +68,10 @@ const App: React.FC = () => {
 
   const loadFiles = async () => {
     try {
-        const list = await api.listFiles();
-        setFiles(list);
+      const list = await api.listFiles();
+      setFiles(list);
     } catch (err) {
-        // Silent fail or default empty
+      setToast({ msg: 'Failed to load files', type: 'error' });
     }
   }
 

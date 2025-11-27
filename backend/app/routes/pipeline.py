@@ -33,6 +33,11 @@ class FileUploadResponse(BaseModel):
     size: int
 
 
+class FileListItem(BaseModel):
+    filename: str
+    size: int
+
+
 class FileDeleteResponse(BaseModel):
     deleted: int
     skipped: int
@@ -114,6 +119,16 @@ def run_pipeline():
     overall["message_count"] = len(results)
 
     return PipelineRunResponse(results=serialized, summary=overall)
+
+
+@router.get("/files", response_model=List[FileListItem])
+def list_files():
+    data_dir = _ensure_data_dir()
+    items: List[FileListItem] = []
+    for path in data_dir.iterdir():
+        if path.is_file():
+            items.append(FileListItem(filename=path.name, size=path.stat().st_size))
+    return items
 
 
 class TechInsightRequest(BaseModel):
