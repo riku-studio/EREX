@@ -179,12 +179,12 @@ def tech_insight(payload: TechInsightRequest):
         prompt += f" Category hint: {payload.category}."
 
     try:
-        completion = client.responses.create(
+        completion = client.chat.completions.create(
             model=Config.OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            max_output_tokens=200,
+            max_tokens=200,
         )
-        insight = completion.output_text
+        insight = completion.choices[0].message.content
     except Exception as exc:  # pragma: no cover - network/dep issues
         logger.error("OpenAI request failed: %s", exc)
         fallback = (
