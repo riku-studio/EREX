@@ -1,6 +1,21 @@
 export interface PipelineConfig {
   summary: Record<string, any>;
   steps: string[];
+  line_filter: Record<string, any>;
+  semantic_templates: Record<string, any>;
+  keywords_tech: Record<string, any>;
+  index_rules: Record<string, any>;
+  classifier_foreigner: Record<string, any>;
+  source?: string;
+}
+
+export interface PipelineConfigUpdatePayload {
+  steps: string[];
+  line_filter: Record<string, any>;
+  semantic_templates: Record<string, any>;
+  keywords_tech: Record<string, any>;
+  index_rules: Record<string, any>;
+  classifier_foreigner: Record<string, any>;
 }
 
 export interface UploadResponseItem {

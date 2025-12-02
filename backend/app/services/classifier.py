@@ -5,7 +5,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Sequence
 
 from app.utils.config import Config
 
@@ -19,6 +19,10 @@ class ClassifierConfig:
     @classmethod
     def from_path(cls, path: str) -> "ClassifierConfig":
         data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return cls.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ClassifierConfig":
         return cls(
             classes=data.get("classes", {}),
             dedupe=bool(data.get("dedupe", True)),
@@ -32,7 +36,11 @@ class Classifier:
     def __init__(self, config_path: str, config: type[Config] = Config):
         self.config_path = config_path
         self.config = config
-        self._raw = ClassifierConfig.from_path(config_path)
+        raw_config = getattr(config, "CLASSIFIER_FOREIGNER_CONFIG", None)
+        if raw_config:
+            self._raw = ClassifierConfig.from_dict(raw_config)
+        else:
+            self._raw = ClassifierConfig.from_path(config_path)
         self.dedupe = self._raw.dedupe
         self.strategy = self._raw.strategy
         self.patterns = self._compile_patterns(self._raw.classes)

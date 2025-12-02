@@ -33,6 +33,32 @@ class IndexRuleStore(Protocol):
         ...
 
 
+class InlineIndexRuleStore:
+    def __init__(self, data: dict):
+        self.data = data or {}
+
+    async def load_rules(self) -> List[IndexRule]:
+        return self._load_from_dict(self.data)
+
+    @staticmethod
+    def _load_from_dict(raw: dict) -> List[IndexRule]:
+        rules: List[IndexRule] = []
+        for item in raw.get("rules", []):
+            if not isinstance(item, dict):
+                continue
+            rule = IndexRule(
+                name=str(item.get("name", "")),
+                pattern=str(item.get("pattern", "")),
+                description=str(item.get("description", "")),
+                enabled=bool(item.get("enabled", True)),
+            )
+            if not rule.name or not rule.pattern:
+                logger.debug("Skip invalid inline index rule: %s", item)
+                continue
+            rules.append(rule)
+        return rules
+
+
 class FileIndexRuleStore:
     def __init__(self, path: str):
         self.path = Path(path)
@@ -138,6 +164,10 @@ class IndexRuleService:
             return self._store_override
 
         source = (self.config.INDEX_RULE_SOURCE or "file").lower()
+        inline_rules = getattr(self.config, "INDEX_RULES_INLINE", None)
+        if inline_rules:
+            logger.info("Loading index rules from inline config (db)")
+            return InlineIndexRuleStore(inline_rules)
         if source == "db":
             dsn = self._build_dsn()
             logger.info(

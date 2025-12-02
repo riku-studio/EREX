@@ -191,6 +191,7 @@ const App: React.FC = () => {
               config={config} 
               loading={loadingConfig} 
               onRefresh={loadConfig} 
+              onConfigUpdated={(cfg) => setConfig(cfg)}
             />
           )}
         </div>

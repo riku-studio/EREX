@@ -9,6 +9,11 @@ from pydantic import BaseModel
 
 from app.services.email_parser import parse_directory, parse_email_file
 from app.services.pipeline import Pipeline
+from app.services.pipeline_config import (
+    PipelineConfigData,
+    PipelineConfigService,
+    get_pipeline_config_service,
+)
 from app.utils.config import Config, PROJECT_ROOT
 from app.utils.logging import logger
 from app.utils.openai_client import get_openai_client
@@ -21,6 +26,25 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 class PipelineConfigResponse(BaseModel):
     summary: dict
     steps: List[str]
+    line_filter: dict
+    semantic_templates: dict
+    keywords_tech: dict
+    index_rules: dict
+    classifier_foreigner: dict
+    source: str = "file"
+
+    @classmethod
+    def from_service(cls, data: PipelineConfigData, summary: dict, source: str) -> "PipelineConfigResponse":
+        return cls(
+            summary=summary,
+            steps=data.steps,
+            line_filter=data.line_filter,
+            semantic_templates=data.semantic_templates,
+            keywords_tech=data.keywords_tech,
+            index_rules=data.index_rules,
+            classifier_foreigner=data.classifier_foreigner,
+            source=source,
+        )
 
 
 class PipelineRunResponse(BaseModel):
@@ -48,9 +72,22 @@ def _ensure_data_dir() -> Path:
     return DATA_DIR
 
 
+class PipelineConfigPayload(BaseModel):
+    steps: List[str]
+    line_filter: dict
+    semantic_templates: dict
+    keywords_tech: dict
+    index_rules: dict
+    classifier_foreigner: dict
+
+    class Config:
+        extra = "ignore"
+
+
 @router.get("/config", response_model=PipelineConfigResponse)
-def get_pipeline_config():
-    return PipelineConfigResponse(summary=Config.summary(), steps=Config.PIPELINE_STEPS)
+async def get_pipeline_config(service: PipelineConfigService = Depends(get_pipeline_config_service)):
+    config_data, source = await service.load_config()
+    return PipelineConfigResponse.from_service(config_data, summary=service.build_summary(), source=source)
 
 
 @router.post("/upload", response_model=List[FileUploadResponse])
@@ -84,8 +121,24 @@ def delete_files(filenames: List[str]):
     return FileDeleteResponse(deleted=deleted, skipped=skipped)
 
 
+@router.put("/config", response_model=PipelineConfigResponse)
+async def update_pipeline_config(
+    payload: PipelineConfigPayload, service: PipelineConfigService = Depends(get_pipeline_config_service)
+):
+    try:
+        stored, source = await service.save_config(PipelineConfigData.from_dict(payload.dict()))
+    except Exception as exc:  # pragma: no cover - db connectivity
+        logger.error("Failed to save pipeline config: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to save pipeline configuration to database",
+        ) from exc
+    return PipelineConfigResponse.from_service(stored, summary=service.build_summary(), source=source)
+
+
 @router.post("/run", response_model=PipelineRunResponse)
-def run_pipeline():
+async def run_pipeline(service: PipelineConfigService = Depends(get_pipeline_config_service)):
+    await service.load_config()
     data_dir = _ensure_data_dir()
     if not data_dir.exists():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="data directory missing")
@@ -96,7 +149,10 @@ def run_pipeline():
         if path.is_file():
             contents.extend(parse_email_file(path))
     if not contents:
-        return PipelineRunResponse(results=[])
+        return PipelineRunResponse(
+            results=[],
+            summary={"message_count": 0, "block_count": 0, "keyword_summary": {}, "class_summary": {}},
+        )
 
     pipeline = Pipeline(Config)
     results = pipeline.process_messages(contents)
@@ -178,13 +234,20 @@ def tech_insight(payload: TechInsightRequest):
     if payload.category:
         prompt += f" Category hint: {payload.category}."
 
+    def _extract_text(content) -> str:
+        if isinstance(content, str):
+            return content
+        try:
+            return "".join(getattr(part, "text", "") for part in content if hasattr(part, "text"))
+        except Exception:
+            return str(content) if content else ""
+
     try:
-        completion = client.chat.completions.create(
+        response = client.responses.create(
             model=Config.OPENAI_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
+            input=prompt
         )
-        insight = completion.choices[0].message.content or ""
+        insight = _extract_text(response.output_text) or ""
     except Exception as exc:  # pragma: no cover - network/dep issues
         logger.error("OpenAI request failed: %s", exc)
         fallback = (

@@ -70,6 +70,7 @@ def _load_json(path: str) -> dict:
 class Config:
     """Global configuration manager"""
 
+    CONFIG_SOURCE = "file"
     APP_NAME = os.getenv("APP_NAME", "myapp")
     APP_ENV = os.getenv("APP_ENV", "development")
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -162,6 +163,7 @@ class Config:
         return {
             "env": cls.APP_ENV,
             "debug": cls.DEBUG,
+            "config_source": getattr(cls, "CONFIG_SOURCE", "file"),
             "db": f"{cls.DB_USER}@{cls.DB_HOST}:{cls.DB_PORT}/{cls.DB_NAME}",
             "log_level": cls.LOG_LEVEL,
             "log_format": cls.LOG_FORMAT,

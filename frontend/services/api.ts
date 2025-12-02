@@ -4,7 +4,8 @@ import {
   DeleteResponse, 
   RunResponse, 
   TechInsightRequest, 
-  TechInsightResponse 
+  TechInsightResponse,
+  PipelineConfigUpdatePayload 
 } from '../types';
 
 const API_BASE =
@@ -35,6 +36,17 @@ export const api = {
       body: formData,
     });
     return handleResponse<UploadResponseItem[]>(res);
+  },
+
+  updateConfig: async (payload: PipelineConfigUpdatePayload): Promise<PipelineConfig> => {
+    const res = await fetch(`${API_BASE}/pipeline/config`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<PipelineConfig>(res);
   },
 
   deleteFiles: async (filenames: string[]): Promise<DeleteResponse> => {
