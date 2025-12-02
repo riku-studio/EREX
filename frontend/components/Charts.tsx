@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie, Legend, LabelList, TooltipProps
+  PieChart, Pie, Legend, TooltipProps
 } from 'recharts';
 import { KeywordStat, ClassStat } from '../types';
 
@@ -38,7 +38,7 @@ export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) 
       <BarChart 
         data={sortedData} 
         layout="vertical" 
-        margin={{ top: 5, right: 80, left: 40, bottom: 5 }}
+        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
       >
         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
         <XAxis type="number" hide />
@@ -59,18 +59,7 @@ export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) 
           barSize={20}
           onClick={(data) => onBarClick(data)}
           className="cursor-pointer hover:opacity-80 transition-opacity"
-        >
-          <LabelList 
-            dataKey="count"
-            position="right"
-            formatter={(value: number, entry: KeywordStat | undefined) => {
-              const ratio = entry?.ratio;
-              return `${value} (${formatPercentage(ratio)})`;
-            }}
-            fill="#0f172a"
-            fontSize={12}
-          />
-        </Bar>
+        />
       </BarChart>
     </ResponsiveContainer>
   );
