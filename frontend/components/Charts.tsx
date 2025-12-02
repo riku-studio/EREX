@@ -10,12 +10,15 @@ interface KeywordChartProps {
   onBarClick: (data: any) => void;
 }
 
-const formatPercentage = (value: number) => `${(value * 100).toFixed(1)}%`;
+const formatPercentage = (value: number | undefined | null) => {
+  const safe = Number.isFinite(value ?? NaN) ? (value as number) : 0;
+  return `${(safe * 100).toFixed(1)}%`;
+};
 
 const KeywordTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
 
-  const keywordData = payload[0].payload as KeywordStat;
+  const keywordData = payload[0].payload as Partial<KeywordStat>;
 
   return (
     <div className="rounded-lg bg-white px-3 py-2 shadow-sm border border-slate-200">
@@ -60,7 +63,10 @@ export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) 
           <LabelList 
             dataKey="count"
             position="right"
-            formatter={(value: number, entry: KeywordStat) => `${value} (${formatPercentage(entry.ratio)})`}
+            formatter={(value: number, entry: KeywordStat | undefined) => {
+              const ratio = entry?.ratio;
+              return `${value} (${formatPercentage(ratio)})`;
+            }}
             fill="#0f172a"
             fontSize={12}
           />
