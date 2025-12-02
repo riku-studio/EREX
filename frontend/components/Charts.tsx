@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie, Legend
+  PieChart, Pie, Legend, LabelList, TooltipProps
 } from 'recharts';
 import { KeywordStat, ClassStat } from '../types';
 
@@ -9,6 +9,22 @@ interface KeywordChartProps {
   data: KeywordStat[];
   onBarClick: (data: any) => void;
 }
+
+const formatPercentage = (value: number) => `${(value * 100).toFixed(1)}%`;
+
+const KeywordTooltip: React.FC<TooltipProps<number, string>> = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+
+  const keywordData = payload[0].payload as KeywordStat;
+
+  return (
+    <div className="rounded-lg bg-white px-3 py-2 shadow-sm border border-slate-200">
+      <p className="text-xs font-semibold text-slate-700">{keywordData.keyword}</p>
+      <p className="text-xs text-slate-500 mt-1">Count: {keywordData.count}</p>
+      <p className="text-xs text-slate-500">Ratio: {formatPercentage(keywordData.ratio)}</p>
+    </div>
+  );
+};
 
 export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) => {
   // Sort by count descending
@@ -19,7 +35,7 @@ export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) 
       <BarChart 
         data={sortedData} 
         layout="vertical" 
-        margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+        margin={{ top: 5, right: 80, left: 40, bottom: 5 }}
       >
         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
         <XAxis type="number" hide />
@@ -31,7 +47,7 @@ export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) 
         />
         <Tooltip 
           cursor={{fill: '#f1f5f9'}}
-          contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+          content={<KeywordTooltip />}
         />
         <Bar 
           dataKey="count" 
@@ -40,7 +56,15 @@ export const KeywordChart: React.FC<KeywordChartProps> = ({ data, onBarClick }) 
           barSize={20}
           onClick={(data) => onBarClick(data)}
           className="cursor-pointer hover:opacity-80 transition-opacity"
-        />
+        >
+          <LabelList 
+            dataKey="count"
+            position="right"
+            formatter={(value: number, entry: KeywordStat) => `${value} (${formatPercentage(entry.ratio)})`}
+            fill="#0f172a"
+            fontSize={12}
+          />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   );
