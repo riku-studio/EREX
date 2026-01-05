@@ -40,6 +40,27 @@ docker compose up --build
 - 后端：`backend`，FastAPI + uv；`uv run uvicorn app.main:app --reload` 本地开发。
 - 前端：`frontend`，Vite + React；`npm install && npm run dev` 本地开发。Docker 镜像内 Nginx 反代 `/pipeline/*` 到后端。
 
+## 配置存储切换（DB / 文件）
+EREX 的 pipeline 配置默认从文件加载；当数据库可用时，前端保存会写入数据库，并在响应里返回 `source=db`。
+
+生效方式：
+- `.env` 变更后需要重启后端进程（本地 `uvicorn` 或 `docker compose up -d --build`）。
+- 本地开发请把 `.env` 放在 `backend/.env`（`load_dotenv()` 从进程当前目录加载），或手动导出环境变量。
+- Docker Compose 方式请确保 `db` 服务已启动；容器内 `DB_HOST=db` 才能解析。
+
+常用环境变量：
+```bash
+DB_HOST=localhost   # 本地运行后端时通常是 localhost；容器内用 db
+DB_PORT=5432
+DB_USER=erex_user
+DB_PASS=your_password
+DB_NAME=erex
+```
+
+排查方法：
+- 运行 `Config.summary()` 检查当前 DB 连接串是否符合预期。
+- 看到前端提示 “file fallback” 说明后端写 DB 失败，优先检查 `DB_HOST` 可解析与 DB 服务是否可达。
+
 ## 目录结构（关键部分）
 - `backend/app/services/`：cleaner、line_filter、semantic、splitter、extractor、classifier、aggregator、pipeline 等核心模块。
 - `backend/config/`：语义模板、行过滤规则、关键字词典、分类器规则。

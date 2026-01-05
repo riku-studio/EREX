@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ../.env
+    environment:
+      - TZ=Asia/Tokyo
+    networks:
+      - shared_network
 
   frontend:
     build:
@@ -14,6 +18,10 @@ services:
       - ../.env
     ports:
       - "127.0.0.1:8002:80"
+    environment:
+      - TZ=Asia/Tokyo
+    networks:
+      - shared_network
 
 #   db:
 #     image: postgres:16
@@ -30,3 +38,6 @@ services:
 
 # volumes:
 #   pgdata:
+networks:
+  shared_network:
+    external: true
