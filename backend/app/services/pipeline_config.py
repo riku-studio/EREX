@@ -149,7 +149,13 @@ class PipelineConfigService:
         return fallback, "file"
 
     async def save_config(self, payload: PipelineConfigData) -> Tuple[PipelineConfigData, str]:
-        saved = await self.repository.save(payload)
+        try:
+            saved = await self.repository.save(payload)
+        except Exception as exc:  # pragma: no cover - db connectivity
+            logger.error("Failed to save pipeline config to database: %s", exc)
+            self.apply_to_runtime(payload, source="file")
+            return payload, "file"
+
         self.apply_to_runtime(saved, source="db")
         return saved, "db"
 

@@ -265,7 +265,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, loading, onRef
         classifier_foreigner: cfg.classifier_foreigner,
       };
       const saved = await api.updateConfig(payload);
-      setStatus({ type: 'success', message: 'Configuration successfully updated in the database.' });
+      const message =
+        saved.source === 'db'
+          ? 'Configuration successfully updated in the database.'
+          : 'Configuration applied with file fallback (database unavailable).';
+      setStatus({ type: 'success', message });
       onConfigUpdated?.(saved);
     } catch (err: any) {
       setStatus({ type: 'error', message: err?.message || 'Failed to save configuration.' });

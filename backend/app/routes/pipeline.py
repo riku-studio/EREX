@@ -125,14 +125,9 @@ def delete_files(filenames: List[str]):
 async def update_pipeline_config(
     payload: PipelineConfigPayload, service: PipelineConfigService = Depends(get_pipeline_config_service)
 ):
-    try:
-        stored, source = await service.save_config(PipelineConfigData.from_dict(payload.dict()))
-    except Exception as exc:  # pragma: no cover - db connectivity
-        logger.error("Failed to save pipeline config: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to save pipeline configuration to database",
-        ) from exc
+    stored, source = await service.save_config(PipelineConfigData.from_dict(payload.dict()))
+    if source != "db":
+        logger.warning("Pipeline config stored using file fallback; database unavailable.")
     return PipelineConfigResponse.from_service(stored, summary=service.build_summary(), source=source)
 
 
