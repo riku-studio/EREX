@@ -127,7 +127,10 @@ class PipelineConfigRepository:
             )
             if not row:
                 return None
-            return PipelineConfigData.from_dict(row["content"])
+            content = row["content"]
+            if isinstance(content, str):
+                content = json.loads(content)
+            return PipelineConfigData.from_dict(content)
         finally:
             await conn.close()
 
@@ -135,15 +138,16 @@ class PipelineConfigRepository:
         conn = await self._connect()
         try:
             await self._ensure_table(conn)
+            content = json.dumps(payload.to_dict())
             await conn.execute(
                 f"""
                 INSERT INTO {self.table_name} (key, content)
-                VALUES ($1, $2)
+                VALUES ($1, $2::jsonb)
                 ON CONFLICT (key)
                 DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()
                 """,
                 "active",
-                payload.to_dict(),
+                content,
             )
             return payload
         finally:
