@@ -82,10 +82,8 @@ class Config:
     DB_USER = os.getenv("DB_USER", "app")
     DB_PASS = os.getenv("DB_PASS", "")
     DB_NAME = os.getenv("DB_NAME", "erex")
-    DB_ADMIN_USER = os.getenv("DB_ADMIN_USER", "")
-    DB_ADMIN_PASS = os.getenv("DB_ADMIN_PASS", "")
-    DB_ADMIN_DB = os.getenv("DB_ADMIN_DB", "postgres")
     DB_BOOTSTRAP = os.getenv("DB_BOOTSTRAP", "true").lower() == "true"
+    DB_BOOTSTRAP_DB = os.getenv("DB_BOOTSTRAP_DB", "postgres")
 
     # Redis
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")

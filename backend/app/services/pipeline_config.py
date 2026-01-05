@@ -71,36 +71,24 @@ class PipelineConfigRepository:
             return f"postgresql://{user}:{password}@{host}:{port}/{db}"
         return f"postgresql://{user}@{host}:{port}/{db}"
 
-    def _admin_dsn(self) -> str:
-        user = self.config.DB_ADMIN_USER or self.config.DB_USER
-        password = self.config.DB_ADMIN_PASS or self.config.DB_PASS
+    def _bootstrap_dsn(self) -> str:
+        user = self.config.DB_USER
+        password = self.config.DB_PASS
         host = self.config.DB_HOST
         port = self.config.DB_PORT
-        db = self.config.DB_ADMIN_DB
+        db = self.config.DB_BOOTSTRAP_DB
         if password:
             return f"postgresql://{user}:{password}@{host}:{port}/{db}"
         return f"postgresql://{user}@{host}:{port}/{db}"
 
     async def _bootstrap_database(self) -> None:
-        admin_dsn = self._admin_dsn()
-        conn = await asyncpg.connect(admin_dsn)
+        bootstrap_dsn = self._bootstrap_dsn()
+        conn = await asyncpg.connect(bootstrap_dsn)
         try:
-            role_exists = await conn.fetchval("SELECT 1 FROM pg_roles WHERE rolname = $1", self.config.DB_USER)
-            if not role_exists:
-                role_ident = self._quote_ident(self.config.DB_USER)
-                if self.config.DB_PASS:
-                    await conn.execute(
-                        f"CREATE ROLE {role_ident} LOGIN PASSWORD $1",
-                        self.config.DB_PASS,
-                    )
-                else:
-                    await conn.execute(f"CREATE ROLE {role_ident} LOGIN")
-
             db_exists = await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", self.config.DB_NAME)
             if not db_exists:
                 db_ident = self._quote_ident(self.config.DB_NAME)
-                owner_ident = self._quote_ident(self.config.DB_USER)
-                await conn.execute(f"CREATE DATABASE {db_ident} OWNER {owner_ident}")
+                await conn.execute(f"CREATE DATABASE {db_ident}")
         finally:
             await conn.close()
 
@@ -110,7 +98,7 @@ class PipelineConfigRepository:
         except Exception as exc:
             if not self.config.DB_BOOTSTRAP:
                 raise
-            logger.warning("Database connection failed; attempting bootstrap: %s", exc)
+            logger.warning("Database connection failed; attempting bootstrap (createdb permission required): %s", exc)
             try:
                 await self._bootstrap_database()
             except Exception as bootstrap_exc:
