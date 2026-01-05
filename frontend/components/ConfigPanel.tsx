@@ -26,6 +26,7 @@ const TagListEditor: React.FC<{
   placeholder?: string;
 }> = ({ label, items, onChange, placeholder }) => {
   const [input, setInput] = useState('');
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   const addItem = () => {
     if (input.trim() && !items.includes(input.trim())) {
@@ -38,6 +39,18 @@ const TagListEditor: React.FC<{
     onChange(items.filter((_, i) => i !== index));
   };
 
+  const handleDrop = (targetIndex: number) => {
+    if (dragIndex === null || dragIndex === targetIndex) {
+      setDragIndex(null);
+      return;
+    }
+    const next = [...items];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    onChange(next);
+    setDragIndex(null);
+  };
+
   return (
     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
       <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
@@ -45,7 +58,18 @@ const TagListEditor: React.FC<{
       </h3>
       <div className="flex flex-wrap gap-2 mb-3">
         {items.map((item, idx) => (
-          <span key={idx} className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-brand-50 text-brand-700 border border-brand-100 group">
+          <span
+            key={idx}
+            draggable
+            onDragStart={() => setDragIndex(idx)}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDrop(idx)}
+            onDragEnd={() => setDragIndex(null)}
+            className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-brand-50 text-brand-700 border border-brand-100 group cursor-move ${
+              dragIndex === idx ? 'opacity-60' : ''
+            }`}
+            title="Drag to reorder"
+          >
             {item}
             <button onClick={() => removeItem(idx)} className="ml-1.5 text-brand-400 hover:text-brand-600 transition-colors">
               <X className="w-3.5 h-3.5" />
