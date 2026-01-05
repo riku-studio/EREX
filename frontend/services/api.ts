@@ -8,9 +8,10 @@ import {
   PipelineConfigUpdatePayload 
 } from '../types';
 
+// Accessing Vite environment variables using type assertion to bypass missing ImportMeta definitions
 const API_BASE =
-  import.meta.env.VITE_API_BASE !== undefined
-    ? import.meta.env.VITE_API_BASE
+  (import.meta as any).env?.VITE_API_BASE !== undefined
+    ? (import.meta as any).env.VITE_API_BASE
     : '';
 
 async function handleResponse<T>(response: Response): Promise<T> {
