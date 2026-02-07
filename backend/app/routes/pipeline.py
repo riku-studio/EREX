@@ -189,7 +189,7 @@ def _create_pipeline_job() -> str:
             "status": "queued",
             "progress": 0.0,
             "stage": "queued",
-            "message": "任务已创建，等待执行",
+            "message": "Job created, waiting to run",
             "current": 0,
             "total": 0,
             "error": None,
@@ -234,17 +234,17 @@ def _execute_pipeline_run(
     total_files = len(email_files)
 
     if total_files == 0:
-        _notify(100.0, "completed", "没有可处理的邮件文件", 0, 0)
+        _notify(100.0, "completed", "No processable email files found", 0, 0)
         return _empty_run_response()
 
     contents = []
-    _notify(2.0, "parse", "扫描并解析邮件文件", 0, total_files)
+    _notify(2.0, "parse", "Scanning and parsing email files", 0, total_files)
     for index, path in enumerate(email_files, start=1):
         contents.extend(parse_email_file(path))
-        _notify(5.0 + (20.0 * index / total_files), "parse", f"已解析: {path.name}", index, total_files)
+        _notify(5.0 + (20.0 * index / total_files), "parse", f"Parsed: {path.name}", index, total_files)
 
     if not contents:
-        _notify(100.0, "completed", "邮件解析完成，但无有效消息", total_files, total_files)
+        _notify(100.0, "completed", "Parsing completed, but no valid messages found", total_files, total_files)
         return _empty_run_response()
 
     pipeline = Pipeline(Config)
@@ -253,9 +253,9 @@ def _execute_pipeline_run(
         mapped = 28.0 + (68.0 * percent / 100.0)
         _notify(mapped, stage_name, message, current, total)
 
-    _notify(28.0, "pipeline", "进入语义与统计处理", 0, len(contents))
+    _notify(28.0, "pipeline", "Starting semantic and aggregation pipeline", 0, len(contents))
     results = pipeline.process_messages(contents, progress_callback=_on_pipeline_progress)
-    _notify(97.0, "finalize", "整理统计结果", len(results), len(results))
+    _notify(97.0, "finalize", "Finalizing aggregated results", len(results), len(results))
 
     serialized: list = []
     all_blocks = []
@@ -274,7 +274,7 @@ def _execute_pipeline_run(
     overall["message_count"] = len(results)
 
     logger.info("Pipeline summary: %s", overall)
-    _notify(100.0, "completed", "处理完成", len(results), len(results))
+    _notify(100.0, "completed", "Processing completed", len(results), len(results))
 
     return PipelineRunResponse(results=serialized, summary=overall)
 
@@ -285,7 +285,7 @@ async def _run_pipeline_job(job_id: str) -> None:
         status="running",
         progress=1.0,
         stage="starting",
-        message="加载运行配置",
+        message="Loading runtime configuration",
         started_at=_utc_now(),
     )
     try:
@@ -309,7 +309,7 @@ async def _run_pipeline_job(job_id: str) -> None:
             status="completed",
             progress=100.0,
             stage="completed",
-            message="任务执行完成",
+            message="Job completed",
             result=result.dict(),
             finished_at=_utc_now(),
         )
@@ -320,7 +320,7 @@ async def _run_pipeline_job(job_id: str) -> None:
             status="failed",
             progress=100.0,
             stage="failed",
-            message="任务执行失败",
+            message="Job failed",
             error=str(exc),
             finished_at=_utc_now(),
         )

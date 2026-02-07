@@ -97,7 +97,7 @@ class Pipeline:
         # Preprocess all messages to batch semantic extraction
         prepared: List[dict] = []
         total_messages = len(messages)
-        _notify(0.0, "preprocess", "准备邮件正文", 0, total_messages)
+        _notify(0.0, "preprocess", "Preparing message bodies", 0, total_messages)
         for index, msg in enumerate(messages, start=1):
             body_clean = clean_body(msg) if "cleaner" in self.steps else getattr(msg, "body", "")
             body_filtered = self._apply_line_filter(body_clean)
@@ -108,19 +108,19 @@ class Pipeline:
                 }
             )
             preprocess_percent = 30.0 * (index / total_messages) if total_messages else 30.0
-            _notify(preprocess_percent, "preprocess", "清洗并过滤邮件正文", index, total_messages)
+            _notify(preprocess_percent, "preprocess", "Cleaning and filtering message body", index, total_messages)
 
         semantic_results: List[SemanticResult | None] = []
         if self.semantic_extractor:
-            _notify(32.0, "semantic", "语义向量计算中", 0, total_messages)
+            _notify(32.0, "semantic", "Computing semantic embeddings", 0, total_messages)
             semantic_results = self.semantic_extractor.extract_batch([p["body_filtered"] for p in prepared])
-            _notify(68.0, "semantic", "语义匹配完成", total_messages, total_messages)
+            _notify(68.0, "semantic", "Semantic matching completed", total_messages, total_messages)
         else:
             semantic_results = [None for _ in prepared]
-            _notify(68.0, "semantic", "跳过语义步骤", total_messages, total_messages)
+            _notify(68.0, "semantic", "Semantic step skipped", total_messages, total_messages)
 
         results: List[PipelineResult] = []
-        _notify(70.0, "aggregate", "分块与统计汇总", 0, total_messages)
+        _notify(70.0, "aggregate", "Splitting and aggregating statistics", 0, total_messages)
         for item, semantic_result in zip(prepared, semantic_results):
             msg = item["message"]
             body_filtered = item["body_filtered"]
@@ -139,5 +139,5 @@ class Pipeline:
             )
             done = len(results)
             aggregate_percent = 70.0 + (30.0 * (done / total_messages) if total_messages else 30.0)
-            _notify(aggregate_percent, "aggregate", "已完成邮件统计", done, total_messages)
+            _notify(aggregate_percent, "aggregate", "Message aggregation completed", done, total_messages)
         return results
