@@ -11,10 +11,15 @@
      - frontend：127.0.0.1:3000 对宿主开放（Nginx 占位）。
      - backend：容器内 8000，仅供内部网络；前端/反代访问。
      - db（仅 database profile）：PostgreSQL 16，仅容器网络。
+   - CUDA 模式（已在 compose 内开启 `backend.gpus: all`）：
+     - `.env` 设置 `SEMANTIC_ACCELERATOR=gpu`（或 `auto`）。
+     - 如需固定卡号可设置 `SEMANTIC_DEVICE=cuda:0`。
+     - 可选覆盖：`NVIDIA_VISIBLE_DEVICES`、`NVIDIA_DRIVER_CAPABILITIES`。
 4. 验证：
    - `curl http://127.0.0.1:3000` 查看占位页。
    - `docker compose exec backend curl http://backend:8000/health`
    - `docker compose exec backend curl http://backend:8000/index-rules` 查看当前索引规则来源。
+   - `docker compose exec backend nvidia-smi` 确认容器内可见 GPU。
 
 ## 生产/准生产（示例流程）
 - 构建并推送镜像：`docker build -t <registry>/erex-backend:<tag> backend/`，`docker build -t <registry>/erex-frontend:<tag> frontend/`。

@@ -2,6 +2,10 @@
 
 ## 配置来源
 - 路径：`backend/config/semantic_job_templates.json`
+- 运行设备（`.env`）：
+  - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`：语义计算模式开关。
+  - `SEMANTIC_DEVICE=`：可选设备覆盖（如 `cpu` / `cuda` / `cuda:0` / `mps`），优先级高于 `SEMANTIC_ACCELERATOR`。
+  - 当 `SEMANTIC_ACCELERATOR=gpu|auto` 且 CUDA 可用时，运行设备自动选择 `cuda`，否则回退 `cpu`。
 - 结构：
   - `context_radius`：构造上下文 segment 时包含的前后行数。
   - `global_threshold`：判断 segment 是否为求人块的全局阈值。

@@ -25,6 +25,14 @@ cd infra
 docker compose up --build
 ```
 > 若需要重新构建：`docker compose build`。
+> `infra/docker-compose.yml` 已为 backend 配置 `gpus: all`，在具备 NVIDIA Container Toolkit 的环境可直接使用 CUDA。
+
+### 2.1 语义计算设备切换（CPU / GPU）
+- 在 `.env` 中设置：
+  - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`
+  - `SEMANTIC_DEVICE=`（可选，强制指定如 `cuda:0`）
+- 推荐 GPU 环境使用：`SEMANTIC_ACCELERATOR=gpu`
+- 验证容器 GPU：`cd infra && docker compose exec backend nvidia-smi`
 
 ### 3. 访问
 - 前端：`http://localhost:8002`（或配置的域名/端口），提供上传、运行、配置查看、可视化等功能。

@@ -3,10 +3,14 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+    restart: unless-stopped
+    gpus: all
     env_file:
       - ../.env
     environment:
       - TZ=Asia/Tokyo
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
     networks:
       - shared_network
 
@@ -14,6 +18,7 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    restart: unless-stopped
     env_file:
       - ../.env
     ports:
