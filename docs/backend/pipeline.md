@@ -17,3 +17,10 @@
 ## Pipeline 配置
 - `Config.PIPELINE_STEPS` 控制启用步骤（默认：`cleaner,line_filter,semantic,splitter,extractor,classifier,aggregator`）。
 - 上传/删除/运行接口：`/pipeline/upload`、`/pipeline/files`、`/pipeline/run`，配置查看：`/pipeline/config`。
+- 异步运行接口：`POST /pipeline/run/start`、`GET /pipeline/run/{job_id}/progress`、`GET /pipeline/run/{job_id}/result`。
+- 历史记录接口（手动保存）：`POST /pipeline/history`、`GET /pipeline/history`、`GET /pipeline/history/{id}`、`DELETE /pipeline/history/{id}`。
+
+## 历史记录行为
+- 默认不自动保存运行结果。
+- 前端用户点击保存后，后端将本次 `PipelineRunResponse` 落盘到 `data/history/*.json`。
+- 历史列表按保存时间倒序展示，可查看详情并删除指定记录。

@@ -42,6 +42,8 @@ docker compose up --build
 - `GET /pipeline/config`：查看当前 pipeline 配置与步骤。
 - `POST /pipeline/upload` / `DELETE /pipeline/files` / `GET /pipeline/files`：文件管理（pst/eml/msg）。
 - `POST /pipeline/run`：运行完整 pipeline（cleaner → line_filter → semantic → splitter → extractor → classifier → aggregator）。
+- `POST /pipeline/run/start` + `GET /pipeline/run/{job_id}/progress` + `GET /pipeline/run/{job_id}/result`：异步运行与进度查询。
+- `POST /pipeline/history` / `GET /pipeline/history` / `GET /pipeline/history/{id}` / `DELETE /pipeline/history/{id}`：手动保存与管理历史结果（默认不自动保存）。
 - `POST /pipeline/tech-insight`：基于关键字统计调用 OpenAI（如未配置 key 则返回占位说明）。
 
 ## 开发说明

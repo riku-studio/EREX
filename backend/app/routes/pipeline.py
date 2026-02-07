@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +25,7 @@ from app.utils.openai_client import get_openai_client
 
 
 DATA_DIR = PROJECT_ROOT / "data"
+HISTORY_DIR = DATA_DIR / "history"
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 SUPPORTED_EMAIL_SUFFIXES = {".eml", ".msg", ".pst"}
 _PIPELINE_JOBS: Dict[str, Dict[str, Any]] = {}
@@ -77,6 +79,25 @@ class PipelineRunProgressResponse(BaseModel):
     finished_at: str | None = None
 
 
+class PipelineHistorySaveRequest(BaseModel):
+    result: PipelineRunResponse
+    title: str | None = None
+
+
+class PipelineHistoryItem(BaseModel):
+    id: str
+    title: str | None = None
+    saved_at: str
+    summary: dict
+
+
+class PipelineHistoryRecord(BaseModel):
+    id: str
+    title: str | None = None
+    saved_at: str
+    result: PipelineRunResponse
+
+
 class FileUploadResponse(BaseModel):
     filename: str
     size: int
@@ -97,6 +118,12 @@ def _ensure_data_dir() -> Path:
     return DATA_DIR
 
 
+def _ensure_history_dir() -> Path:
+    _ensure_data_dir()
+    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+    return HISTORY_DIR
+
+
 class PipelineConfigPayload(BaseModel):
     steps: List[str]
     line_filter: dict
@@ -111,6 +138,40 @@ class PipelineConfigPayload(BaseModel):
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _history_file(record_id: str) -> Path:
+    if not record_id.isalnum():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid history id")
+    return _ensure_history_dir() / f"{record_id}.json"
+
+
+def _parse_history_record(path: Path) -> PipelineHistoryRecord | None:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.error("Failed to read history file %s: %s", path, exc)
+        return None
+
+    try:
+        return PipelineHistoryRecord(
+            id=str(data.get("id") or path.stem),
+            title=data.get("title"),
+            saved_at=str(data.get("saved_at") or ""),
+            result=PipelineRunResponse(**(data.get("result") or _empty_run_response().dict())),
+        )
+    except Exception as exc:
+        logger.error("Failed to parse history payload %s: %s", path, exc)
+        return None
+
+
+def _history_item_from_record(record: PipelineHistoryRecord) -> PipelineHistoryItem:
+    return PipelineHistoryItem(
+        id=record.id,
+        title=record.title,
+        saved_at=record.saved_at,
+        summary=record.result.summary,
+    )
 
 
 def _empty_run_response() -> PipelineRunResponse:
@@ -358,6 +419,59 @@ def get_pipeline_result(job_id: str):
         )
     payload = state.get("result") or _empty_run_response().dict()
     return PipelineRunResponse(**payload)
+
+
+@router.post("/history", response_model=PipelineHistoryItem)
+def save_pipeline_history(payload: PipelineHistorySaveRequest):
+    record_id = uuid4().hex
+    saved_at = _utc_now()
+    record = {
+        "id": record_id,
+        "title": payload.title,
+        "saved_at": saved_at,
+        "result": payload.result.dict(),
+    }
+    target = _history_file(record_id)
+    target.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    parsed = PipelineHistoryRecord(
+        id=record_id,
+        title=payload.title,
+        saved_at=saved_at,
+        result=payload.result,
+    )
+    return _history_item_from_record(parsed)
+
+
+@router.get("/history", response_model=List[PipelineHistoryItem])
+def list_pipeline_history():
+    history_dir = _ensure_history_dir()
+    items: List[PipelineHistoryItem] = []
+    for path in sorted(history_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        record = _parse_history_record(path)
+        if record is None:
+            continue
+        items.append(_history_item_from_record(record))
+    return items
+
+
+@router.get("/history/{record_id}", response_model=PipelineHistoryRecord)
+def get_pipeline_history(record_id: str):
+    target = _history_file(record_id)
+    if not target.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="history record not found")
+    record = _parse_history_record(target)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="failed to parse history record")
+    return record
+
+
+@router.delete("/history/{record_id}")
+def delete_pipeline_history(record_id: str):
+    target = _history_file(record_id)
+    if not target.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="history record not found")
+    target.unlink()
+    return {"deleted": 1}
 
 
 @router.get("/files", response_model=List[FileListItem])

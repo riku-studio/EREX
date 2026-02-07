@@ -5,6 +5,8 @@ import {
   RunResponse, 
   RunStartResponse,
   RunProgressResponse,
+  HistoryItem,
+  HistoryRecord,
   TechInsightRequest, 
   TechInsightResponse,
   PipelineConfigUpdatePayload 
@@ -90,6 +92,34 @@ export const api = {
   getPipelineResult: async (jobId: string): Promise<RunResponse> => {
     const res = await fetch(`${API_BASE}/pipeline/run/${jobId}/result`);
     return handleResponse<RunResponse>(res);
+  },
+
+  savePipelineHistory: async (result: RunResponse, title?: string): Promise<HistoryItem> => {
+    const res = await fetch(`${API_BASE}/pipeline/history`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ result, title }),
+    });
+    return handleResponse<HistoryItem>(res);
+  },
+
+  listPipelineHistory: async (): Promise<HistoryItem[]> => {
+    const res = await fetch(`${API_BASE}/pipeline/history`);
+    return handleResponse<HistoryItem[]>(res);
+  },
+
+  getPipelineHistory: async (recordId: string): Promise<HistoryRecord> => {
+    const res = await fetch(`${API_BASE}/pipeline/history/${recordId}`);
+    return handleResponse<HistoryRecord>(res);
+  },
+
+  deletePipelineHistory: async (recordId: string): Promise<{ deleted: number }> => {
+    const res = await fetch(`${API_BASE}/pipeline/history/${recordId}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<{ deleted: number }>(res);
   },
 
   getTechInsight: async (payload: TechInsightRequest): Promise<TechInsightResponse> => {

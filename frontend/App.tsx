@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, FolderOpen, Settings, Info } from 'lucide-react';
+import { LayoutDashboard, FolderOpen, Settings, Info, Archive } from 'lucide-react';
 
 import { api } from './services/api';
 import { 
@@ -7,6 +7,8 @@ import {
   UploadResponseItem, 
   RunResponse, 
   RunProgressResponse,
+  HistoryItem,
+  HistoryRecord,
   TabView, 
   TechInsightRequest,
   TechInsightResponse
@@ -16,6 +18,7 @@ import { ConfigPanel } from './components/ConfigPanel';
 import { FileManager } from './components/FileManager';
 import { RunDashboard } from './components/RunDashboard';
 import { TechInsightModal } from './components/TechInsightModal';
+import { HistoryPanel } from './components/HistoryPanel';
 
 const App: React.FC = () => {
   // Navigation State
@@ -26,12 +29,20 @@ const App: React.FC = () => {
   const [files, setFiles] = useState<UploadResponseItem[]>([]);
   const [runResults, setRunResults] = useState<RunResponse | null>(null);
   const [runProgress, setRunProgress] = useState<RunProgressResponse | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyDetail, setHistoryDetail] = useState<HistoryRecord | null>(null);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   
   // Loading States
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [running, setRunning] = useState(false);
   const [insightLoading, setInsightLoading] = useState(false);
+  const [savingHistory, setSavingHistory] = useState(false);
+  const [loadingHistoryList, setLoadingHistoryList] = useState(false);
+  const [loadingHistoryDetail, setLoadingHistoryDetail] = useState(false);
+
+  const [activeRunHistoryId, setActiveRunHistoryId] = useState<string | null>(null);
 
   // Modal State
   const [insightModal, setInsightModal] = useState<{ isOpen: boolean; keyword: string | null; data: TechInsightResponse | null }>({
@@ -46,6 +57,7 @@ const App: React.FC = () => {
   useEffect(() => {
     loadConfig();
     loadFiles();
+    loadHistory();
   }, []);
 
   useEffect(() => {
@@ -104,6 +116,7 @@ const App: React.FC = () => {
     setRunning(true);
     setRunResults(null);
     setRunProgress(null);
+    setActiveRunHistoryId(null);
     try {
       const started = await api.startPipelineRun();
       let progress = await api.getPipelineProgress(started.job_id);
@@ -127,6 +140,65 @@ const App: React.FC = () => {
       setToast({ msg: 'Pipeline run failed', type: 'error' });
     } finally {
       setRunning(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    setLoadingHistoryList(true);
+    try {
+      const items = await api.listPipelineHistory();
+      setHistoryItems(items);
+      if (items.length === 0) {
+        setSelectedHistoryId(null);
+        setHistoryDetail(null);
+      }
+    } catch (err) {
+      setToast({ msg: 'Failed to load history', type: 'error' });
+    } finally {
+      setLoadingHistoryList(false);
+    }
+  };
+
+  const handleSaveRunResult = async () => {
+    if (!runResults || activeRunHistoryId) return;
+    setSavingHistory(true);
+    try {
+      const saved = await api.savePipelineHistory(runResults);
+      setActiveRunHistoryId(saved.id);
+      setToast({ msg: 'Run result saved', type: 'success' });
+      await loadHistory();
+    } catch (err) {
+      setToast({ msg: 'Failed to save run result', type: 'error' });
+    } finally {
+      setSavingHistory(false);
+    }
+  };
+
+  const handleSelectHistory = async (recordId: string) => {
+    setSelectedHistoryId(recordId);
+    setLoadingHistoryDetail(true);
+    try {
+      const detail = await api.getPipelineHistory(recordId);
+      setHistoryDetail(detail);
+    } catch (err) {
+      setToast({ msg: 'Failed to load history detail', type: 'error' });
+    } finally {
+      setLoadingHistoryDetail(false);
+    }
+  };
+
+  const handleDeleteHistory = async (recordId: string) => {
+    if (!confirm('Delete this history record?')) return;
+    try {
+      await api.deletePipelineHistory(recordId);
+      setToast({ msg: 'History record deleted', type: 'success' });
+      if (selectedHistoryId === recordId) {
+        setSelectedHistoryId(null);
+        setHistoryDetail(null);
+      }
+      await loadHistory();
+    } catch (err) {
+      setToast({ msg: 'Failed to delete history record', type: 'error' });
     }
   };
 
@@ -175,6 +247,13 @@ const App: React.FC = () => {
             icon={<Settings size={18}/>} 
             label="Configuration" 
           />
+          <NavButton 
+            active={activeTab === 'history'} 
+            onClick={() => setActiveTab('history')} 
+            icon={<Archive size={18}/>} 
+            label="History"
+            badge={historyItems.length > 0 ? historyItems.length : undefined}
+          />
         </nav>
         
         <div className="absolute bottom-0 w-full md:w-64 p-4 border-t border-slate-100 bg-slate-50/50">
@@ -191,7 +270,10 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && (
             <RunDashboard 
               onRun={handleRun} 
+              onSaveResult={handleSaveRunResult}
               isRunning={running} 
+              isSavingResult={savingHistory}
+              canSaveResult={!!runResults && !activeRunHistoryId}
               results={runResults}
               progress={runProgress}
               onInsightRequest={handleTechInsight}
@@ -211,6 +293,18 @@ const App: React.FC = () => {
               loading={loadingConfig} 
               onRefresh={loadConfig} 
               onConfigUpdated={(cfg) => setConfig(cfg)}
+            />
+          )}
+          {activeTab === 'history' && (
+            <HistoryPanel
+              items={historyItems}
+              selectedId={selectedHistoryId}
+              selectedRecord={historyDetail}
+              loadingList={loadingHistoryList}
+              loadingDetail={loadingHistoryDetail}
+              onRefresh={loadHistory}
+              onSelect={handleSelectHistory}
+              onDelete={handleDeleteHistory}
             />
           )}
         </div>

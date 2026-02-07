@@ -91,6 +91,20 @@ export interface RunProgressResponse {
   finished_at?: string | null;
 }
 
+export interface HistoryItem {
+  id: string;
+  title?: string | null;
+  saved_at: string;
+  summary: RunSummary;
+}
+
+export interface HistoryRecord {
+  id: string;
+  title?: string | null;
+  saved_at: string;
+  result: RunResponse;
+}
+
 export interface TechInsightRequest {
   keyword: string;
   count: number;
@@ -104,4 +118,4 @@ export interface TechInsightResponse {
 }
 
 // UI specific types
-export type TabView = 'dashboard' | 'files' | 'config';
+export type TabView = 'dashboard' | 'files' | 'config' | 'history';

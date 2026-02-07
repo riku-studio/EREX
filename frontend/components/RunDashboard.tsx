@@ -1,18 +1,30 @@
 import React, { useState } from 'react';
-import { Play, Sparkles, FileText, BarChart2, PieChart as PieIcon, ChevronDown, ChevronUp, Search, Activity } from 'lucide-react';
+import { Play, Sparkles, FileText, BarChart2, PieChart as PieIcon, ChevronDown, ChevronUp, Search, Activity, Save } from 'lucide-react';
 import { Button } from './Button';
 import { RunResponse, MailResult, TechInsightRequest, KeywordStat, RunProgressResponse } from '../types';
 import { KeywordChart, ClassChart } from './Charts';
 
 interface RunDashboardProps {
   onRun: () => void;
+  onSaveResult?: () => void;
   isRunning: boolean;
+  isSavingResult?: boolean;
+  canSaveResult?: boolean;
   results: RunResponse | null;
   progress: RunProgressResponse | null;
   onInsightRequest: (req: TechInsightRequest) => void;
 }
 
-export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, results, progress, onInsightRequest }) => {
+export const RunDashboard: React.FC<RunDashboardProps> = ({
+  onRun,
+  onSaveResult,
+  isRunning,
+  isSavingResult,
+  canSaveResult = false,
+  results,
+  progress,
+  onInsightRequest,
+}) => {
   const [expandedMail, setExpandedMail] = useState<number | null>(null);
 
   const toggleExpand = (idx: number) => {
@@ -103,9 +115,20 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, re
               Status: {isRunning ? `Running ${progressValue.toFixed(0)}%` : 'Complete'}
             </span>
         </div>
-        <Button onClick={onRun} isLoading={isRunning} variant="secondary" icon={<Play className="w-4 h-4"/>}>
-          Rerun
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={onSaveResult}
+            isLoading={isSavingResult}
+            disabled={!results || isRunning || !canSaveResult}
+            variant="secondary"
+            icon={<Save className="w-4 h-4" />}
+          >
+            {canSaveResult ? 'Save Result' : 'Saved'}
+          </Button>
+          <Button onClick={onRun} isLoading={isRunning} variant="secondary" icon={<Play className="w-4 h-4"/>}>
+            Rerun
+          </Button>
+        </div>
       </div>
 
       {results && (
