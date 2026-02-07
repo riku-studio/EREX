@@ -73,6 +73,24 @@ export interface RunResponse {
   summary: RunSummary;
 }
 
+export interface RunStartResponse {
+  job_id: string;
+  status: string;
+}
+
+export interface RunProgressResponse {
+  job_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | string;
+  progress: number;
+  stage: string;
+  message: string;
+  current: number;
+  total: number;
+  error?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
 export interface TechInsightRequest {
   keyword: string;
   count: number;

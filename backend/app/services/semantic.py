@@ -44,13 +44,15 @@ def _load_model() -> EmbeddingModel:
             "semantic extraction requires sentence-transformers; install dependencies."
         ) from exc
 
+    resolved_device = Config.semantic_runtime_device()
     logger.info(
-        "Loading semantic model %s on device=%s (batch_size=%d)",
+        "Loading semantic model %s on accelerator=%s, device=%s (batch_size=%d)",
         Config.SEMANTIC_MODEL,
-        Config.SEMANTIC_DEVICE,
+        Config.SEMANTIC_ACCELERATOR,
+        resolved_device,
         Config.SEMANTIC_BATCH_SIZE,
     )
-    return SentenceTransformer(Config.SEMANTIC_MODEL, device=Config.SEMANTIC_DEVICE)
+    return SentenceTransformer(Config.SEMANTIC_MODEL, device=resolved_device)
 
 
 def prepare_semantic_input(body: str, line_filter: LineFilter | None = None) -> str:

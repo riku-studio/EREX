@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Play, Sparkles, FileText, BarChart2, PieChart as PieIcon, ChevronDown, ChevronUp, Search, Info } from 'lucide-react';
+import { Play, Sparkles, FileText, BarChart2, PieChart as PieIcon, ChevronDown, ChevronUp, Search, Activity } from 'lucide-react';
 import { Button } from './Button';
-import { RunResponse, MailResult, TechInsightRequest, KeywordStat } from '../types';
+import { RunResponse, MailResult, TechInsightRequest, KeywordStat, RunProgressResponse } from '../types';
 import { KeywordChart, ClassChart } from './Charts';
 
 interface RunDashboardProps {
   onRun: () => void;
   isRunning: boolean;
   results: RunResponse | null;
+  progress: RunProgressResponse | null;
   onInsightRequest: (req: TechInsightRequest) => void;
 }
 
-export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, results, onInsightRequest }) => {
+export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, results, progress, onInsightRequest }) => {
   const [expandedMail, setExpandedMail] = useState<number | null>(null);
 
   const toggleExpand = (idx: number) => {
@@ -26,6 +27,9 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, re
       category
     });
   };
+
+  const progressValue = Math.max(0, Math.min(100, progress?.progress ?? 0));
+  const stageLabel = progress?.message || 'Analyzing content and calculating embeddings...';
 
   if (!results && !isRunning) {
     return (
@@ -46,15 +50,45 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, re
 
   if (isRunning && !results) {
     return (
-      <div className="flex flex-col items-center justify-center py-32">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-slate-200 border-t-brand-600 rounded-full animate-spin"></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-brand-500 animate-pulse" />
+      <div className="py-20">
+        <div className="relative overflow-hidden rounded-2xl border border-cyan-300/50 bg-slate-950 px-8 py-10 shadow-[0_0_40px_rgba(6,182,212,0.18)]">
+          <div className="pointer-events-none absolute -inset-24 bg-[radial-gradient(circle_at_20%_10%,rgba(14,165,233,0.25),transparent_35%),radial-gradient(circle_at_85%_90%,rgba(56,189,248,0.2),transparent_40%)]"></div>
+          <div className="relative flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full border border-cyan-300/60 bg-cyan-500/10 p-2">
+                <Activity className="h-5 w-5 text-cyan-300 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">Pipeline Telemetry</p>
+                <p className="mt-1 text-lg font-semibold text-cyan-50">Processing Large Mail Batch</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-cyan-200/80">Progress</p>
+              <p className="text-3xl font-bold text-cyan-50 tabular-nums">{progressValue.toFixed(1)}%</p>
+            </div>
+          </div>
+
+          <div className="relative mt-8 h-4 rounded-full border border-cyan-300/30 bg-slate-900/80 p-[2px]">
+            <div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#06b6d4_0%,#0ea5e9_45%,#22d3ee_100%)] shadow-[0_0_18px_rgba(34,211,238,0.8)] transition-all duration-500 ease-out"
+              style={{ width: `${progressValue}%` }}
+            />
+            <div className="pointer-events-none absolute inset-0 rounded-full bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.28)_50%,transparent_100%)] animate-pulse"></div>
+          </div>
+
+          <div className="relative mt-4 flex items-center justify-between text-sm text-cyan-100">
+            <p>{stageLabel}</p>
+            <p className="font-mono text-cyan-300">
+              {(progress?.current ?? 0)}/{Math.max(progress?.total ?? 0, 0)}
+            </p>
+          </div>
+
+          <div className="relative mt-3 flex items-center gap-2 text-cyan-200/80">
+            <Sparkles className="h-4 w-4 animate-pulse" />
+            <span className="text-xs tracking-wide">GPU/CPU adaptive semantic engine is running</span>
           </div>
         </div>
-        <p className="mt-6 text-lg font-medium text-slate-700">Processing Pipeline...</p>
-        <p className="text-slate-500">Analyzing content, extracting keywords, and classifying.</p>
       </div>
     );
   }
@@ -65,7 +99,9 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({ onRun, isRunning, re
       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200 sticky top-0 z-10">
         <div className="flex items-center gap-3">
             <div className={`h-3 w-3 rounded-full ${isRunning ? 'bg-yellow-400 animate-pulse' : 'bg-green-500'}`} />
-            <span className="font-semibold text-slate-700">Status: {isRunning ? 'Running...' : 'Complete'}</span>
+            <span className="font-semibold text-slate-700">
+              Status: {isRunning ? `Running ${progressValue.toFixed(0)}%` : 'Complete'}
+            </span>
         </div>
         <Button onClick={onRun} isLoading={isRunning} variant="secondary" icon={<Play className="w-4 h-4"/>}>
           Rerun

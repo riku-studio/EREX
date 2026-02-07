@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from threading import Lock
+from typing import Any, Callable, Dict, List
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from app.services.email_parser import parse_directory, parse_email_file
+from app.services.email_parser import parse_email_file
 from app.services.pipeline import Pipeline
 from app.services.pipeline_config import (
     PipelineConfigData,
@@ -21,6 +25,9 @@ from app.utils.openai_client import get_openai_client
 
 DATA_DIR = PROJECT_ROOT / "data"
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+SUPPORTED_EMAIL_SUFFIXES = {".eml", ".msg", ".pst"}
+_PIPELINE_JOBS: Dict[str, Dict[str, Any]] = {}
+_PIPELINE_JOBS_LOCK = Lock()
 
 
 class PipelineConfigResponse(BaseModel):
@@ -50,6 +57,24 @@ class PipelineConfigResponse(BaseModel):
 class PipelineRunResponse(BaseModel):
     results: list
     summary: dict
+
+
+class PipelineRunStartResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+class PipelineRunProgressResponse(BaseModel):
+    job_id: str
+    status: str
+    progress: float
+    stage: str
+    message: str
+    current: int
+    total: int
+    error: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
 
 
 class FileUploadResponse(BaseModel):
@@ -82,6 +107,162 @@ class PipelineConfigPayload(BaseModel):
 
     class Config:
         extra = "ignore"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _empty_run_response() -> PipelineRunResponse:
+    return PipelineRunResponse(
+        results=[],
+        summary={"message_count": 0, "block_count": 0, "keyword_summary": {}, "class_summary": {}},
+    )
+
+
+def _create_pipeline_job() -> str:
+    job_id = uuid4().hex
+    with _PIPELINE_JOBS_LOCK:
+        _PIPELINE_JOBS[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "progress": 0.0,
+            "stage": "queued",
+            "message": "任务已创建，等待执行",
+            "current": 0,
+            "total": 0,
+            "error": None,
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+        }
+    return job_id
+
+
+def _update_pipeline_job(job_id: str, **kwargs: Any) -> None:
+    with _PIPELINE_JOBS_LOCK:
+        state = _PIPELINE_JOBS.get(job_id)
+        if state is None:
+            return
+        state.update(kwargs)
+
+
+def _get_pipeline_job(job_id: str) -> Dict[str, Any]:
+    with _PIPELINE_JOBS_LOCK:
+        state = _PIPELINE_JOBS.get(job_id)
+        if state is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+        return dict(state)
+
+
+def _execute_pipeline_run(
+    progress_hook: Callable[[float, str, str, int, int], None] | None = None,
+) -> PipelineRunResponse:
+    def _notify(progress: float, stage_name: str, message: str, current: int, total: int) -> None:
+        if progress_hook is None:
+            return
+        bounded = min(100.0, max(0.0, float(progress)))
+        progress_hook(bounded, stage_name, message, current, total)
+
+    data_dir = _ensure_data_dir()
+    if not data_dir.exists():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="data directory missing")
+
+    files = [path for path in data_dir.iterdir() if path.is_file()]
+    email_files = [path for path in files if path.suffix.lower() in SUPPORTED_EMAIL_SUFFIXES]
+    total_files = len(email_files)
+
+    if total_files == 0:
+        _notify(100.0, "completed", "没有可处理的邮件文件", 0, 0)
+        return _empty_run_response()
+
+    contents = []
+    _notify(2.0, "parse", "扫描并解析邮件文件", 0, total_files)
+    for index, path in enumerate(email_files, start=1):
+        contents.extend(parse_email_file(path))
+        _notify(5.0 + (20.0 * index / total_files), "parse", f"已解析: {path.name}", index, total_files)
+
+    if not contents:
+        _notify(100.0, "completed", "邮件解析完成，但无有效消息", total_files, total_files)
+        return _empty_run_response()
+
+    pipeline = Pipeline(Config)
+
+    def _on_pipeline_progress(percent: float, stage_name: str, message: str, current: int, total: int) -> None:
+        mapped = 28.0 + (68.0 * percent / 100.0)
+        _notify(mapped, stage_name, message, current, total)
+
+    _notify(28.0, "pipeline", "进入语义与统计处理", 0, len(contents))
+    results = pipeline.process_messages(contents, progress_callback=_on_pipeline_progress)
+    _notify(97.0, "finalize", "整理统计结果", len(results), len(results))
+
+    serialized: list = []
+    all_blocks = []
+    for res in results:
+        serialized.append(
+            {
+                "source_path": res.source_path,
+                "subject": res.subject,
+                "semantic": res.semantic,
+                "aggregation": res.aggregation,
+            }
+        )
+        all_blocks.extend(res.blocks)
+
+    overall = pipeline.aggregator.aggregate_blocks(all_blocks) if pipeline.aggregator else {}
+    overall["message_count"] = len(results)
+
+    logger.info("Pipeline summary: %s", overall)
+    _notify(100.0, "completed", "处理完成", len(results), len(results))
+
+    return PipelineRunResponse(results=serialized, summary=overall)
+
+
+async def _run_pipeline_job(job_id: str) -> None:
+    _update_pipeline_job(
+        job_id,
+        status="running",
+        progress=1.0,
+        stage="starting",
+        message="加载运行配置",
+        started_at=_utc_now(),
+    )
+    try:
+        service = get_pipeline_config_service()
+        await service.load_config()
+
+        def _progress(percent: float, stage_name: str, message: str, current: int, total: int) -> None:
+            _update_pipeline_job(
+                job_id,
+                status="running",
+                progress=percent,
+                stage=stage_name,
+                message=message,
+                current=current,
+                total=total,
+            )
+
+        result = await asyncio.to_thread(_execute_pipeline_run, _progress)
+        _update_pipeline_job(
+            job_id,
+            status="completed",
+            progress=100.0,
+            stage="completed",
+            message="任务执行完成",
+            result=result.dict(),
+            finished_at=_utc_now(),
+        )
+    except Exception as exc:  # pragma: no cover - runtime safety
+        logger.exception("Pipeline job failed: %s", exc)
+        _update_pipeline_job(
+            job_id,
+            status="failed",
+            progress=100.0,
+            stage="failed",
+            message="任务执行失败",
+            error=str(exc),
+            finished_at=_utc_now(),
+        )
 
 
 @router.get("/config", response_model=PipelineConfigResponse)
@@ -134,44 +315,49 @@ async def update_pipeline_config(
 @router.post("/run", response_model=PipelineRunResponse)
 async def run_pipeline(service: PipelineConfigService = Depends(get_pipeline_config_service)):
     await service.load_config()
-    data_dir = _ensure_data_dir()
-    if not data_dir.exists():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="data directory missing")
+    return _execute_pipeline_run()
 
-    # Parse all files under data_dir (eml/msg/pst)
-    contents = []
-    for path in data_dir.iterdir():
-        if path.is_file():
-            contents.extend(parse_email_file(path))
-    if not contents:
-        return PipelineRunResponse(
-            results=[],
-            summary={"message_count": 0, "block_count": 0, "keyword_summary": {}, "class_summary": {}},
+
+@router.post("/run/start", response_model=PipelineRunStartResponse)
+async def start_pipeline_run():
+    job_id = _create_pipeline_job()
+    asyncio.create_task(_run_pipeline_job(job_id))
+    return PipelineRunStartResponse(job_id=job_id, status="queued")
+
+
+@router.get("/run/{job_id}/progress", response_model=PipelineRunProgressResponse)
+def get_pipeline_progress(job_id: str):
+    state = _get_pipeline_job(job_id)
+    return PipelineRunProgressResponse(
+        job_id=job_id,
+        status=str(state.get("status", "unknown")),
+        progress=float(state.get("progress", 0.0)),
+        stage=str(state.get("stage", "unknown")),
+        message=str(state.get("message", "")),
+        current=int(state.get("current", 0)),
+        total=int(state.get("total", 0)),
+        error=state.get("error"),
+        started_at=state.get("started_at"),
+        finished_at=state.get("finished_at"),
+    )
+
+
+@router.get("/run/{job_id}/result", response_model=PipelineRunResponse)
+def get_pipeline_result(job_id: str):
+    state = _get_pipeline_job(job_id)
+    state_status = str(state.get("status", "unknown"))
+    if state_status == "failed":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=state.get("error") or "pipeline job failed",
         )
-
-    pipeline = Pipeline(Config)
-    results = pipeline.process_messages(contents)
-
-    serialized: list = []
-    all_blocks = []
-    for res in results:
-        serialized.append(
-            {
-                "source_path": res.source_path,
-                "subject": res.subject,
-                "semantic": res.semantic,
-                "aggregation": res.aggregation,
-            }
+    if state_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"job not completed (status={state_status})",
         )
-        all_blocks.extend(res.blocks)
-
-    # Overall summary across all messages
-    overall = pipeline.aggregator.aggregate_blocks(all_blocks) if pipeline.aggregator else {}
-    overall["message_count"] = len(results)
-
-    logger.info("Pipeline summary: %s", overall)
-
-    return PipelineRunResponse(results=serialized, summary=overall)
+    payload = state.get("result") or _empty_run_response().dict()
+    return PipelineRunResponse(**payload)
 
 
 @router.get("/files", response_model=List[FileListItem])

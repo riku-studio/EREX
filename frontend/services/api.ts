@@ -3,6 +3,8 @@ import {
   UploadResponseItem, 
   DeleteResponse, 
   RunResponse, 
+  RunStartResponse,
+  RunProgressResponse,
   TechInsightRequest, 
   TechInsightResponse,
   PipelineConfigUpdatePayload 
@@ -70,6 +72,23 @@ export const api = {
     const res = await fetch(`${API_BASE}/pipeline/run`, {
       method: 'POST',
     });
+    return handleResponse<RunResponse>(res);
+  },
+
+  startPipelineRun: async (): Promise<RunStartResponse> => {
+    const res = await fetch(`${API_BASE}/pipeline/run/start`, {
+      method: 'POST',
+    });
+    return handleResponse<RunStartResponse>(res);
+  },
+
+  getPipelineProgress: async (jobId: string): Promise<RunProgressResponse> => {
+    const res = await fetch(`${API_BASE}/pipeline/run/${jobId}/progress`);
+    return handleResponse<RunProgressResponse>(res);
+  },
+
+  getPipelineResult: async (jobId: string): Promise<RunResponse> => {
+    const res = await fetch(`${API_BASE}/pipeline/run/${jobId}/result`);
     return handleResponse<RunResponse>(res);
   },
 

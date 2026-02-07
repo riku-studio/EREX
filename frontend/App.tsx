@@ -6,6 +6,7 @@ import {
   PipelineConfig, 
   UploadResponseItem, 
   RunResponse, 
+  RunProgressResponse,
   TabView, 
   TechInsightRequest,
   TechInsightResponse
@@ -24,6 +25,7 @@ const App: React.FC = () => {
   const [config, setConfig] = useState<PipelineConfig | null>(null);
   const [files, setFiles] = useState<UploadResponseItem[]>([]);
   const [runResults, setRunResults] = useState<RunResponse | null>(null);
+  const [runProgress, setRunProgress] = useState<RunProgressResponse | null>(null);
   
   // Loading States
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -101,11 +103,27 @@ const App: React.FC = () => {
   const handleRun = async () => {
     setRunning(true);
     setRunResults(null);
+    setRunProgress(null);
     try {
-      const results = await api.runPipeline();
+      const started = await api.startPipelineRun();
+      let progress = await api.getPipelineProgress(started.job_id);
+      setRunProgress(progress);
+
+      while (progress.status === 'queued' || progress.status === 'running') {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        progress = await api.getPipelineProgress(started.job_id);
+        setRunProgress(progress);
+      }
+
+      if (progress.status === 'failed') {
+        throw new Error(progress.error || 'Pipeline job failed');
+      }
+
+      const results = await api.getPipelineResult(started.job_id);
       setRunResults(results);
       setToast({ msg: 'Pipeline finished successfully', type: 'success' });
     } catch (err) {
+      console.error(err);
       setToast({ msg: 'Pipeline run failed', type: 'error' });
     } finally {
       setRunning(false);
@@ -175,6 +193,7 @@ const App: React.FC = () => {
               onRun={handleRun} 
               isRunning={running} 
               results={runResults}
+              progress={runProgress}
               onInsightRequest={handleTechInsight}
             />
           )}

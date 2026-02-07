@@ -100,7 +100,8 @@ class Config:
     # Semantic (template-based) extraction
     SEMANTIC_MODEL = os.getenv("SEMANTIC_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
-    SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "cpu")
+    SEMANTIC_ACCELERATOR = os.getenv("SEMANTIC_ACCELERATOR", "cpu").strip().lower()
+    SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "").strip()
     SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
     SEMANTIC_SHOW_PROGRESS = os.getenv("SEMANTIC_SHOW_PROGRESS", "false").lower() == "true"
     SEMANTIC_TEMPLATES_PATH = os.getenv("SEMANTIC_TEMPLATES_PATH", _default_semantic_templates_path())
@@ -173,7 +174,8 @@ class Config:
             "openai_model": cls.OPENAI_MODEL,
             "semantic_model": cls.SEMANTIC_MODEL,
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
-            "semantic_device": cls.SEMANTIC_DEVICE,
+            "semantic_accelerator": cls.SEMANTIC_ACCELERATOR,
+            "semantic_device": cls.semantic_runtime_device(),
             "semantic_show_progress": cls.SEMANTIC_SHOW_PROGRESS,
             "semantic_templates_path": cls.SEMANTIC_TEMPLATES_PATH,
             "semantic_context_radius": cls.SEMANTIC_CONTEXT_RADIUS,
@@ -188,6 +190,28 @@ class Config:
             "index_rules_path": cls.INDEX_RULES_PATH,
             "index_rule_table": cls.INDEX_RULE_TABLE,
         }
+
+    @classmethod
+    def semantic_runtime_device(cls) -> str:
+        if cls.SEMANTIC_DEVICE:
+            return cls.SEMANTIC_DEVICE
+
+        mode = cls.SEMANTIC_ACCELERATOR
+        if mode not in {"cpu", "gpu", "auto"}:
+            mode = "cpu"
+
+        if mode == "cpu":
+            return "cpu"
+
+        try:
+            import torch
+        except Exception:
+            return "cpu"
+
+        if bool(torch.cuda.is_available()):
+            return "cuda"
+
+        return "cpu"
 
     @classmethod
     def semantic_global_templates(cls) -> list[str]:
