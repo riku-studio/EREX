@@ -1,5 +1,5 @@
 import React from 'react';
-import { Archive, RefreshCw, Trash2, Clock3, FileText, BarChart3 } from 'lucide-react';
+import { Archive, RefreshCw, Trash2, Clock3, FileText, BarChart3, Search } from 'lucide-react';
 import { Button } from './Button';
 import { HistoryItem, HistoryRecord } from '../types';
 
@@ -118,19 +118,33 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
               </div>
 
               <div>
-                <h4 className="text-sm font-semibold text-slate-700 mb-2">Mail Results ({selectedRecord.result.results.length})</h4>
-                {selectedRecord.result.results.length === 0 ? (
-                  <p className="text-sm text-slate-500">No message results in this run.</p>
+                <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <Search className="w-4 h-4 text-brand-600" />
+                  Top Keywords
+                </h4>
+                {Object.keys(selectedRecord.result.summary.keyword_summary || {}).length === 0 ? (
+                  <p className="text-sm text-slate-500">No keyword summary in this run.</p>
                 ) : (
-                  <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
-                    {selectedRecord.result.results.map((mail, index) => (
-                      <div key={`${mail.source_path}-${index}`} className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                        <p className="text-sm font-medium text-slate-800 truncate">{mail.subject || '(No Subject)'}</p>
-                        <p className="text-xs text-slate-500 truncate mt-0.5">{mail.source_path}</p>
-                        <div className="mt-1 text-xs text-slate-600">
-                          Semantic: {mail.semantic?.matched ? `${mail.semantic.score.toFixed(2)} matched` : 'not matched'} · Blocks:{' '}
-                          {mail.aggregation?.block_count ?? 0}
-                        </div>
+                  <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                    {Object.entries(selectedRecord.result.summary.keyword_summary).map(([category, keywords]) => (
+                      <div key={category} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{category}</p>
+                        {keywords.length === 0 ? (
+                          <p className="text-xs text-slate-500">No keywords</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {keywords.slice(0, 20).map((keyword) => (
+                              <span
+                                key={`${category}-${keyword.keyword}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs text-brand-700"
+                              >
+                                <span className="font-semibold">{keyword.keyword}</span>
+                                <span className="text-brand-500">· {keyword.count}</span>
+                                <span className="text-brand-500">· {(keyword.ratio * 100).toFixed(1)}%</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
