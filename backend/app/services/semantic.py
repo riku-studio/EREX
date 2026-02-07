@@ -27,14 +27,6 @@ class SemanticResult:
     line_scores: List[float]
 
 
-@dataclass
-class Segment:
-    text: str
-    start: int
-    end: int
-    body_index: int
-
-
 @lru_cache(maxsize=1)
 def _load_model() -> EmbeddingModel:
     try:
@@ -85,7 +77,16 @@ class SemanticExtractor:
         self.field_threshold = field_threshold if field_threshold is not None else Config.SEMANTIC_JOB_FIELD_THRESHOLD
 
         self.global_embeddings = self._embed(self.global_templates)
+        self.negative_templates = Config.semantic_negative_templates()
+        self.negative_embeddings = self._embed(self.negative_templates)
         self.field_embeddings = {name: self._embed(values) for name, values in self.field_templates.items() if values}
+        self.negative_weight = Config.SEMANTIC_NEGATIVE_WEIGHT
+        self.length_penalty = Config.SEMANTIC_LENGTH_PENALTY
+        self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
+        self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
+        self.candidate_top_n = max(1, Config.SEMANTIC_CANDIDATE_TOP_N)
+        self.candidate_radius = max(1, Config.SEMANTIC_CANDIDATE_RADIUS)
+        self.candidate_min_score = Config.SEMANTIC_CANDIDATE_MIN_SCORE
 
     def _embed(self, sentences: Sequence[str]) -> np.ndarray:
         if not sentences:
@@ -98,60 +99,16 @@ class SemanticExtractor:
         )
         return np.asarray(embeddings, dtype=float)
 
-    def _build_segments(self, lines: List[str]) -> List[Segment]:
-        segments: List[Segment] = []
-        total = len(lines)
-        for idx in range(total):
-            start = max(0, idx - self.context_radius)
-            end = min(total - 1, idx + self.context_radius)
-            segment_text = "\n".join(lines[start : end + 1])
-            segments.append(Segment(text=segment_text, start=start, end=end, body_index=0))
-        return segments
+    def _max_sim(self, embedding: np.ndarray, templates: np.ndarray) -> float:
+        if embedding.size == 0 or templates.size == 0:
+            return 0.0
+        sims = embedding @ templates.T
+        return float(np.max(sims)) if sims.size else 0.0
 
-    def _prepare_batch(
-        self, bodies: Sequence[str]
-    ) -> Tuple[List[Segment], List[List[int]], List[List[str]]]:
-        all_segments: List[Segment] = []
-        segment_indices_by_body: List[List[int]] = []
-        lines_per_body: List[List[str]] = []
-
-        for body_index, body in enumerate(bodies):
-            prepared_body = prepare_semantic_input(body, line_filter=self.line_filter)
-            lines = [line for line in prepared_body.splitlines() if line.strip()]
-            lines_per_body.append(lines)
-
-            if not lines:
-                segment_indices_by_body.append([])
-                continue
-
-            segments = self._build_segments(lines)
-            offset = len(all_segments)
-            for seg in segments:
-                seg.body_index = body_index
-                all_segments.append(seg)
-            segment_indices_by_body.append(list(range(offset, offset + len(segments))))
-
-        return all_segments, segment_indices_by_body, lines_per_body
-
-    def _compute_global_scores(self, segment_embeddings: np.ndarray) -> np.ndarray:
-        if segment_embeddings.size == 0:
-            return np.asarray([], dtype=float)
-        if self.global_embeddings.size == 0:
-            return np.zeros(segment_embeddings.shape[0], dtype=float)
-        sims = segment_embeddings @ self.global_embeddings.T
-        return np.max(sims, axis=1)
-
-    def _score_lines(self, total_lines: int, segments: List[Segment], segment_scores: Sequence[float]) -> List[float]:
-        scores = [0.0 for _ in range(total_lines)]
-        for segment, score in zip(segments, segment_scores):
-            for idx in range(segment.start, segment.end + 1):
-                scores[idx] = max(scores[idx], float(score))
-        return scores
-
-    def _log_field_debug(self, segment_embeddings: np.ndarray) -> None:
+    def _log_field_debug(self, line_embeddings: np.ndarray) -> None:
         if not logger.isEnabledFor(logging.DEBUG):
             return
-        if segment_embeddings.size == 0:
+        if line_embeddings.size == 0:
             return
 
         max_scores: Dict[str, float] = {}
@@ -159,7 +116,7 @@ class SemanticExtractor:
             if embeds.size == 0:
                 max_scores[name] = 0.0
                 continue
-            sims = segment_embeddings @ embeds.T
+            sims = line_embeddings @ embeds.T
             max_scores[name] = float(np.max(sims)) if sims.size else 0.0
         if max_scores:
             logger.debug(
@@ -167,105 +124,146 @@ class SemanticExtractor:
                 ", ".join(f"{k}:{v:.3f}" for k, v in max_scores.items()),
             )
 
-    def _compute_result_for_body(
-        self,
-        lines: List[str],
-        body_segment_indices: List[int],
-        segments: List[Segment],
-        global_scores: Sequence[float],
-    ) -> Optional[SemanticResult]:
-        if not lines:
-            return None
-        if not body_segment_indices:
-            return SemanticResult(
-                text="",
-                score=0.0,
-                start_line=None,
-                end_line=None,
-                matched=False,
-                line_scores=[0.0 for _ in lines],
-            )
-
-        body_segments = [segments[i] for i in body_segment_indices]
-        body_scores = [global_scores[i] for i in body_segment_indices]
-        line_scores = self._score_lines(len(lines), body_segments, body_scores)
-
-        hits = [idx for idx, score in enumerate(body_scores) if score >= self.global_threshold]
-        if not hits:
-            return SemanticResult(
-                text="",
-                score=0.0,
-                start_line=None,
-                end_line=None,
-                matched=False,
-                line_scores=[float(v) for v in line_scores],
-            )
-
-        clusters: List[tuple[int, int, List[float]]] = []
-        current: List[int] = []
-        for idx in hits:
-            if not current:
-                current.append(idx)
-                continue
-            prev_idx = current[-1]
-            prev_segment = body_segments[prev_idx]
-            curr_segment = body_segments[idx]
-            if curr_segment.start <= prev_segment.end + 1:
-                current.append(idx)
-            else:
-                clusters.append(
-                    (
-                        min(body_segments[i].start for i in current),
-                        max(body_segments[i].end for i in current),
-                        [float(body_scores[i]) for i in current],
-                    )
-                )
-                current = [idx]
-        if current:
-            clusters.append(
-                (
-                    min(body_segments[i].start for i in current),
-                    max(body_segments[i].end for i in current),
-                    [float(body_scores[i]) for i in current],
-                )
-            )
-
-        best_cluster = max(clusters, key=lambda item: float(np.mean(item[2]) if item[2] else 0.0))
-        start_line, end_line, matched_scores = best_cluster
-        segment_text = "\n".join(lines[start_line : end_line + 1]).strip()
-
-        return SemanticResult(
-            text=segment_text,
-            score=float(np.mean(matched_scores)) if matched_scores else 0.0,
-            start_line=start_line,
-            end_line=end_line,
-            matched=True,
-            line_scores=[float(v) for v in line_scores],
+    def _line_scores(self, line_embeddings: np.ndarray) -> np.ndarray:
+        if line_embeddings.size == 0:
+            return np.asarray([], dtype=float)
+        pos_scores = np.max(line_embeddings @ self.global_embeddings.T, axis=1) if self.global_embeddings.size else 0.0
+        neg_scores = (
+            np.max(line_embeddings @ self.negative_embeddings.T, axis=1) if self.negative_embeddings.size else 0.0
         )
+        return np.asarray(pos_scores, dtype=float) - (self.negative_weight * np.asarray(neg_scores, dtype=float))
+
+    def _candidate_centers(self, line_scores: np.ndarray) -> List[int]:
+        if line_scores.size == 0:
+            return []
+        ranked = sorted(enumerate(line_scores.tolist()), key=lambda item: item[1], reverse=True)
+        centers = [idx for idx, score in ranked if score >= self.candidate_min_score][: self.candidate_top_n]
+        if not centers and ranked:
+            centers = [ranked[0][0]]
+        return centers
+
+    def _window_embedding(self, prefix: np.ndarray, start: int, end: int) -> np.ndarray:
+        window_sum = prefix[end + 1] - prefix[start]
+        window_len = max(1, end - start + 1)
+        window_vec = window_sum / float(window_len)
+        norm = float(np.linalg.norm(window_vec))
+        if norm > 0:
+            window_vec = window_vec / norm
+        return window_vec
+
+    def _window_score(self, window_embedding: np.ndarray, window_len: int) -> float:
+        pos = self._max_sim(window_embedding, self.global_embeddings)
+        neg = self._max_sim(window_embedding, self.negative_embeddings)
+        return pos - (self.negative_weight * neg) - (self.length_penalty * float(np.log1p(window_len)))
+
+    def _search_best_window(self, line_embeddings: np.ndarray, line_scores: np.ndarray) -> Tuple[Optional[Tuple[int, int]], float]:
+        total_lines = line_embeddings.shape[0]
+        if total_lines == 0:
+            return None, 0.0
+
+        max_lines = min(self.window_max_lines, total_lines)
+        min_lines = min(self.min_lines, max_lines)
+        centers = self._candidate_centers(line_scores)
+
+        windows: set[Tuple[int, int]] = set()
+        for center in centers:
+            left = max(0, center - self.candidate_radius)
+            right = min(total_lines - 1, center + self.candidate_radius)
+            for length in range(min_lines, max_lines + 1):
+                start_lo = max(left, center - length + 1)
+                start_hi = min(center, right - length + 1)
+                if start_lo > start_hi:
+                    continue
+                for start in range(start_lo, start_hi + 1):
+                    windows.add((start, start + length - 1))
+
+        if not windows:
+            for length in range(min_lines, max_lines + 1):
+                for start in range(0, total_lines - length + 1):
+                    windows.add((start, start + length - 1))
+
+        prefix = np.vstack([np.zeros((1, line_embeddings.shape[1]), dtype=float), np.cumsum(line_embeddings, axis=0)])
+        best_window: Optional[Tuple[int, int]] = None
+        best_score = -1e9
+        best_line_sum = -1e9
+        for start, end in windows:
+            window_vec = self._window_embedding(prefix, start, end)
+            score = self._window_score(window_vec, end - start + 1)
+            window_line_sum = float(np.sum(line_scores[start : end + 1]))
+            if score > best_score or (abs(score - best_score) <= 1e-9 and window_line_sum > best_line_sum):
+                best_score = score
+                best_line_sum = window_line_sum
+                best_window = (start, end)
+
+        return best_window, float(best_score if best_score > -1e8 else 0.0)
 
     def extract_batch(self, bodies: Sequence[str]) -> List[Optional[SemanticResult]]:
-        segments, segment_indices_by_body, lines_per_body = self._prepare_batch(bodies)
-        if not segments and not any(lines_per_body):
+        lines_per_body: List[List[str]] = []
+        for body in bodies:
+            prepared_body = prepare_semantic_input(body, line_filter=self.line_filter)
+            lines = [line for line in prepared_body.splitlines() if line.strip()]
+            lines_per_body.append(lines)
+
+        if not any(lines_per_body):
             return [None for _ in bodies]
 
-        segment_embeddings = self._embed([segment.text for segment in segments]) if segments else np.empty((0, 0))
-        global_scores = self._compute_global_scores(segment_embeddings) if segments else np.asarray([], dtype=float)
+        all_lines = [line for lines in lines_per_body for line in lines]
+        all_line_embeddings = self._embed(all_lines) if all_lines else np.empty((0, 0))
+        self._log_field_debug(all_line_embeddings)
 
-        top_samples = sorted(
-            [(idx, score) for idx, score in enumerate(global_scores)], key=lambda item: item[1], reverse=True
-        )[:5]
+        offsets: List[Tuple[int, int]] = []
+        cursor = 0
+        for lines in lines_per_body:
+            start = cursor
+            cursor += len(lines)
+            offsets.append((start, cursor))
+
+        results: List[Optional[SemanticResult]] = []
+        best_scores: List[float] = []
+        for lines, (start, end) in zip(lines_per_body, offsets):
+            if not lines:
+                results.append(None)
+                continue
+
+            line_embeddings = all_line_embeddings[start:end]
+            line_scores = self._line_scores(line_embeddings)
+            best_window, best_score = self._search_best_window(line_embeddings, line_scores)
+            best_scores.append(best_score)
+
+            if best_window is None or best_score < self.global_threshold:
+                results.append(
+                    SemanticResult(
+                        text="",
+                        score=max(0.0, float(best_score)),
+                        start_line=None,
+                        end_line=None,
+                        matched=False,
+                        line_scores=[float(v) for v in line_scores.tolist()],
+                    )
+                )
+                continue
+
+            start_line, end_line = best_window
+            matched_text = "\n".join(lines[start_line : end_line + 1]).strip()
+            results.append(
+                SemanticResult(
+                    text=matched_text,
+                    score=float(best_score),
+                    start_line=start_line,
+                    end_line=end_line,
+                    matched=True,
+                    line_scores=[float(v) for v in line_scores.tolist()],
+                )
+            )
+
+        top_samples = sorted(enumerate(best_scores), key=lambda item: item[1], reverse=True)[:5]
         logger.info(
-            "Semantic scoring: segments=%d, global_threshold=%.3f, top_scores=%s",
-            len(segments),
+            "Semantic window scoring: bodies=%d, threshold=%.3f, top_scores=%s",
+            len(lines_per_body),
             self.global_threshold,
             ", ".join(f"{i}:{s:.3f}" for i, s in top_samples),
         )
-        self._log_field_debug(segment_embeddings)
 
-        results: List[Optional[SemanticResult]] = []
-        for body_indices, lines in zip(segment_indices_by_body, lines_per_body):
-            result = self._compute_result_for_body(lines, body_indices, segments, global_scores)
-            results.append(result)
         return results
 
     def extract(self, body: str) -> Optional[SemanticResult]:

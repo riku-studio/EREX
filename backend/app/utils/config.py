@@ -115,6 +115,18 @@ class Config:
     SEMANTIC_JOB_FIELD_THRESHOLD = float(
         os.getenv("SEMANTIC_JOB_FIELD_THRESHOLD", _SEMANTIC_TEMPLATES.get("field_threshold", 0.4))
     )
+    _SEMANTIC_SEARCH = _SEMANTIC_TEMPLATES.get("search", {}) if isinstance(_SEMANTIC_TEMPLATES, dict) else {}
+    SEMANTIC_NEGATIVE_WEIGHT = float(os.getenv("SEMANTIC_NEGATIVE_WEIGHT", _SEMANTIC_SEARCH.get("negative_weight", 0.35)))
+    SEMANTIC_LENGTH_PENALTY = float(os.getenv("SEMANTIC_LENGTH_PENALTY", _SEMANTIC_SEARCH.get("length_penalty", 0.02)))
+    SEMANTIC_WINDOW_MAX_LINES = int(os.getenv("SEMANTIC_WINDOW_MAX_LINES", _SEMANTIC_SEARCH.get("window_max_lines", 24)))
+    SEMANTIC_MIN_LINES = int(os.getenv("SEMANTIC_MIN_LINES", _SEMANTIC_SEARCH.get("min_lines", 2)))
+    SEMANTIC_CANDIDATE_TOP_N = int(os.getenv("SEMANTIC_CANDIDATE_TOP_N", _SEMANTIC_SEARCH.get("candidate_top_n", 8)))
+    SEMANTIC_CANDIDATE_RADIUS = int(
+        os.getenv("SEMANTIC_CANDIDATE_RADIUS", _SEMANTIC_SEARCH.get("candidate_radius", 20))
+    )
+    SEMANTIC_CANDIDATE_MIN_SCORE = float(
+        os.getenv("SEMANTIC_CANDIDATE_MIN_SCORE", _SEMANTIC_SEARCH.get("candidate_min_score", 0.05))
+    )
 
     # Keyword extractor
     KEYWORDS_TECH_PATH = os.getenv("KEYWORDS_TECH_PATH", _default_keywords_path())
@@ -181,6 +193,13 @@ class Config:
             "semantic_context_radius": cls.SEMANTIC_CONTEXT_RADIUS,
             "semantic_global_threshold": cls.SEMANTIC_JOB_GLOBAL_THRESHOLD,
             "semantic_field_threshold": cls.SEMANTIC_JOB_FIELD_THRESHOLD,
+            "semantic_negative_weight": cls.SEMANTIC_NEGATIVE_WEIGHT,
+            "semantic_length_penalty": cls.SEMANTIC_LENGTH_PENALTY,
+            "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
+            "semantic_min_lines": cls.SEMANTIC_MIN_LINES,
+            "semantic_candidate_top_n": cls.SEMANTIC_CANDIDATE_TOP_N,
+            "semantic_candidate_radius": cls.SEMANTIC_CANDIDATE_RADIUS,
+            "semantic_candidate_min_score": cls.SEMANTIC_CANDIDATE_MIN_SCORE,
             "keywords_tech_path": cls.KEYWORDS_TECH_PATH,
             "line_filter_enabled": cls.ENABLE_LINE_FILTER,
             "line_filter_config_path": cls.LINE_FILTER_CONFIG_PATH,
@@ -227,6 +246,11 @@ class Config:
                 if isinstance(value, list):
                     output[str(key)] = [str(v) for v in value]
         return output
+
+    @classmethod
+    def semantic_negative_templates(cls) -> list[str]:
+        data = cls._SEMANTIC_TEMPLATES.get("negative", [])
+        return list(data) if isinstance(data, list) else []
 
     @classmethod
     def keywords_tech(cls) -> dict[str, list[str]]:

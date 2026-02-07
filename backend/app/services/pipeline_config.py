@@ -217,6 +217,14 @@ class PipelineConfigService:
             semantic.get("global_threshold", cfg.SEMANTIC_JOB_GLOBAL_THRESHOLD)
         )
         cfg.SEMANTIC_JOB_FIELD_THRESHOLD = float(semantic.get("field_threshold", cfg.SEMANTIC_JOB_FIELD_THRESHOLD))
+        search = semantic.get("search", {}) if isinstance(semantic.get("search", {}), dict) else {}
+        cfg.SEMANTIC_NEGATIVE_WEIGHT = float(search.get("negative_weight", cfg.SEMANTIC_NEGATIVE_WEIGHT))
+        cfg.SEMANTIC_LENGTH_PENALTY = float(search.get("length_penalty", cfg.SEMANTIC_LENGTH_PENALTY))
+        cfg.SEMANTIC_WINDOW_MAX_LINES = int(search.get("window_max_lines", cfg.SEMANTIC_WINDOW_MAX_LINES))
+        cfg.SEMANTIC_MIN_LINES = int(search.get("min_lines", cfg.SEMANTIC_MIN_LINES))
+        cfg.SEMANTIC_CANDIDATE_TOP_N = int(search.get("candidate_top_n", cfg.SEMANTIC_CANDIDATE_TOP_N))
+        cfg.SEMANTIC_CANDIDATE_RADIUS = int(search.get("candidate_radius", cfg.SEMANTIC_CANDIDATE_RADIUS))
+        cfg.SEMANTIC_CANDIDATE_MIN_SCORE = float(search.get("candidate_min_score", cfg.SEMANTIC_CANDIDATE_MIN_SCORE))
 
         cfg._LINE_FILTER_SETTINGS = payload.line_filter or {}
         cfg.LINE_FILTER_DECORATION_CHARS = cfg._LINE_FILTER_SETTINGS.get("decoration_chars", "")

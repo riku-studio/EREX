@@ -7,22 +7,21 @@ class FakeModel:
     def encode(self, sentences, **kwargs):
         vectors = []
         for s in sentences:
-            if "hit" in s or "GLOBAL" in s:
+            if "job" in s or "GLOBAL" in s:
                 vectors.append(np.array([1.0, 0.0]))
-            elif "field-skill" in s:
+            elif "greet" in s or "NEG" in s:
                 vectors.append(np.array([0.0, 1.0]))
             else:
                 vectors.append(np.array([0.0, 0.0]))
         return vectors
 
 
-def test_extract_marks_relevant_segments():
-    body = "intro line\nhit line here\ntrailing"
+def test_extract_marks_relevant_multi_line_window():
+    body = "greet hello\njob line one\njob line two\ngreet footer"
     extractor = SemanticExtractor(
         model=FakeModel(),
         global_templates=["GLOBAL"],
-        global_threshold=0.5,
-        context_radius=0,
+        global_threshold=0.2,
         field_templates={},
     )
 
@@ -30,19 +29,17 @@ def test_extract_marks_relevant_segments():
 
     assert result is not None
     assert result.matched is True
-    assert result.text == "hit line here"
+    assert result.text == "job line one\njob line two"
     assert result.start_line == 1
-    assert result.end_line == 1
-    assert result.line_scores == [0.0, 1.0, 0.0]
+    assert result.end_line == 2
 
 
 def test_extract_returns_no_match_when_below_threshold():
-    body = "foo\nbar\nbaz"
+    body = "greet foo\ngreet bar\ngreet baz"
     extractor = SemanticExtractor(
         model=FakeModel(),
         global_templates=["GLOBAL"],
-        global_threshold=0.9,
-        context_radius=0,
+        global_threshold=0.8,
         field_templates={},
     )
 
@@ -53,36 +50,36 @@ def test_extract_returns_no_match_when_below_threshold():
     assert result.text == ""
     assert result.start_line is None
     assert result.end_line is None
-    assert result.line_scores == [0.0, 0.0, 0.0]
+    assert len(result.line_scores) == 3
 
 
-def test_context_radius_expands_scoring_range():
-    body = "first\nhit center\nlast"
+def test_negative_templates_reduce_greeting_bias():
+    body = "greet line\njob core line\ngreet sign-off"
     extractor = SemanticExtractor(
         model=FakeModel(),
         global_templates=["GLOBAL"],
-        global_threshold=0.5,
-        context_radius=1,
+        global_threshold=0.1,
         field_templates={},
     )
+    extractor.min_lines = 1
+    extractor.negative_templates = ["NEG"]
+    extractor.negative_embeddings = extractor._embed(extractor.negative_templates)
 
     result = extractor.extract(body)
 
     assert result is not None
     assert result.matched is True
-    assert result.text == body
-    assert result.start_line == 0
-    assert result.end_line == 2
-    assert all(score >= 0.5 for score in result.line_scores)
+    assert result.text == "job core line"
+    assert result.start_line == 1
+    assert result.end_line == 1
 
 
 def test_extract_batch_returns_results_per_body():
-    bodies = ["intro\nhit line", "no match here"]
+    bodies = ["greet\njob line", "greet only"]
     extractor = SemanticExtractor(
         model=FakeModel(),
         global_templates=["GLOBAL"],
-        global_threshold=0.5,
-        context_radius=0,
+        global_threshold=0.2,
         field_templates={},
     )
 
@@ -93,34 +90,37 @@ def test_extract_batch_returns_results_per_body():
     assert results[1] is not None and results[1].matched is False
 
 
-def test_best_contiguous_cluster_is_chosen():
+def test_best_window_is_chosen_for_multi_line_content():
     class WeightedModel:
         def encode(self, sentences, **kwargs):
             vectors = []
             for s in sentences:
-                if "hitA" in s:
+                if "jobA" in s:
                     vectors.append(np.array([1.0, 0.0]))
-                elif "hitB" in s:
+                elif "jobB" in s:
                     vectors.append(np.array([0.6, 0.0]))
                 elif "GLOBAL" in s:
                     vectors.append(np.array([1.0, 0.0]))
+                elif "NEG" in s:
+                    vectors.append(np.array([0.0, 1.0]))
                 else:
                     vectors.append(np.array([0.0, 0.0]))
             return vectors
 
-    body = "hitA one\nnoise line\nhitB two"
+    body = "greet one\njobA one\njobB two\ngreet two"
     extractor = SemanticExtractor(
         model=WeightedModel(),
         global_templates=["GLOBAL"],
-        global_threshold=0.5,
-        context_radius=0,
+        global_threshold=0.2,
         field_templates={},
     )
+    extractor.negative_templates = ["NEG"]
+    extractor.negative_embeddings = extractor._embed(extractor.negative_templates)
 
     result = extractor.extract(body)
 
     assert result is not None
     assert result.matched is True
-    assert result.text == "hitA one"
-    assert result.start_line == 0
-    assert result.end_line == 0
+    assert result.text == "jobA one\njobB two"
+    assert result.start_line == 1
+    assert result.end_line == 2

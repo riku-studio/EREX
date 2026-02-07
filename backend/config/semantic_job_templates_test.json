@@ -1,0 +1,56 @@
+{
+  "context_radius": 1,
+  "global_threshold": 0.45,
+  "field_threshold": 0.4,
+  "global": [
+    "案件概要",
+    "募集要項",
+    "必須スキル",
+    "業務内容",
+    "単価",
+    "勤務地",
+    "稼働開始",
+    "募集背景"
+  ],
+  "negative": [
+    "いつもお世話になっております",
+    "ご査収ください",
+    "どうぞよろしくお願いいたします",
+    "署名",
+    "会社名",
+    "配信停止"
+  ],
+  "search": {
+    "negative_weight": 0.35,
+    "length_penalty": 0.02,
+    "window_max_lines": 20,
+    "min_lines": 2,
+    "candidate_top_n": 10,
+    "candidate_radius": 18,
+    "candidate_min_score": 0.05
+  },
+  "fields": {
+    "overview": [
+      "【案件概要】Webアプリ開発支援",
+      "【募集背景】体制強化のため増員"
+    ],
+    "work_content": [
+      "【業務内容】基本設計、詳細設計、実装、試験"
+    ],
+    "skill": [
+      "【必須スキル】Java/Spring Boot",
+      "【尚可スキル】AWS、Docker"
+    ],
+    "working_conditions": [
+      "【勤務地】都内/リモート併用",
+      "【期間】即日～長期"
+    ],
+    "contract": [
+      "【単価】70万～90万",
+      "【精算】140-180h"
+    ],
+    "restriction": [
+      "【外国籍】可（N1相当）"
+    ]
+  }
+}
