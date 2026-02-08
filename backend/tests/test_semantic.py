@@ -24,6 +24,9 @@ def test_extract_marks_relevant_multi_line_window():
         global_threshold=0.2,
         field_templates={},
     )
+    extractor.min_lines = 2
+    extractor.negative_templates = ["NEG"]
+    extractor.negative_embeddings = extractor._embed(extractor.negative_templates)
 
     result = extractor.extract(body)
 
@@ -114,6 +117,7 @@ def test_best_window_is_chosen_for_multi_line_content():
         global_threshold=0.2,
         field_templates={},
     )
+    extractor.min_lines = 2
     extractor.negative_templates = ["NEG"]
     extractor.negative_embeddings = extractor._embed(extractor.negative_templates)
 

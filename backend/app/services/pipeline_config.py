@@ -218,6 +218,7 @@ class PipelineConfigService:
         )
         cfg.SEMANTIC_JOB_FIELD_THRESHOLD = float(semantic.get("field_threshold", cfg.SEMANTIC_JOB_FIELD_THRESHOLD))
         search = semantic.get("search", {}) if isinstance(semantic.get("search", {}), dict) else {}
+        cfg.SEMANTIC_POS_TOP_K = int(search.get("pos_top_k", cfg.SEMANTIC_POS_TOP_K))
         cfg.SEMANTIC_NEGATIVE_WEIGHT = float(search.get("negative_weight", cfg.SEMANTIC_NEGATIVE_WEIGHT))
         cfg.SEMANTIC_LENGTH_PENALTY = float(search.get("length_penalty", cfg.SEMANTIC_LENGTH_PENALTY))
         cfg.SEMANTIC_WINDOW_MAX_LINES = int(search.get("window_max_lines", cfg.SEMANTIC_WINDOW_MAX_LINES))

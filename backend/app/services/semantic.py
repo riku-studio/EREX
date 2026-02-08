@@ -81,6 +81,7 @@ class SemanticExtractor:
         self.negative_embeddings = self._embed(self.negative_templates)
         self.field_embeddings = {name: self._embed(values) for name, values in self.field_templates.items() if values}
         self.negative_weight = Config.SEMANTIC_NEGATIVE_WEIGHT
+        self.pos_top_k = max(1, Config.SEMANTIC_POS_TOP_K)
         self.length_penalty = Config.SEMANTIC_LENGTH_PENALTY
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
         self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
@@ -101,6 +102,17 @@ class SemanticExtractor:
             return 0.0
         sims = embedding @ templates.T
         return float(np.max(sims)) if sims.size else 0.0
+
+    def _mean_topk_sim(self, embedding: np.ndarray, templates: np.ndarray, top_k: int) -> float:
+        if embedding.size == 0 or templates.size == 0:
+            return 0.0
+        sims = embedding @ templates.T
+        if sims.size == 0:
+            return 0.0
+        flat = np.ravel(sims)
+        k = min(max(1, top_k), flat.shape[0])
+        top = np.partition(flat, flat.shape[0] - k)[-k:]
+        return float(np.mean(top))
 
     def _log_field_debug(self, line_embeddings: np.ndarray) -> None:
         if not logger.isEnabledFor(logging.DEBUG):
@@ -131,7 +143,8 @@ class SemanticExtractor:
         return window_vec
 
     def _window_score(self, window_embedding: np.ndarray, window_len: int) -> float:
-        pos = self._max_sim(window_embedding, self.global_embeddings)
+        # Fixed to tuned best rule: mean_pos_max_neg.
+        pos = self._mean_topk_sim(window_embedding, self.global_embeddings, self.pos_top_k)
         neg = self._max_sim(window_embedding, self.negative_embeddings)
         return pos - (self.negative_weight * neg) - (self.length_penalty * float(np.log1p(window_len)))
 

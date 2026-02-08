@@ -145,6 +145,7 @@ class Config:
         os.getenv("SEMANTIC_JOB_FIELD_THRESHOLD", _SEMANTIC_TEMPLATES.get("field_threshold", 0.4))
     )
     _SEMANTIC_SEARCH = _SEMANTIC_TEMPLATES.get("search", {}) if isinstance(_SEMANTIC_TEMPLATES, dict) else {}
+    SEMANTIC_POS_TOP_K = int(os.getenv("SEMANTIC_POS_TOP_K", _SEMANTIC_SEARCH.get("pos_top_k", 3)))
     SEMANTIC_NEGATIVE_WEIGHT = float(os.getenv("SEMANTIC_NEGATIVE_WEIGHT", _SEMANTIC_SEARCH.get("negative_weight", 0.35)))
     SEMANTIC_LENGTH_PENALTY = float(os.getenv("SEMANTIC_LENGTH_PENALTY", _SEMANTIC_SEARCH.get("length_penalty", 0.02)))
     SEMANTIC_WINDOW_MAX_LINES = int(os.getenv("SEMANTIC_WINDOW_MAX_LINES", _SEMANTIC_SEARCH.get("window_max_lines", 24)))
@@ -218,6 +219,7 @@ class Config:
             "semantic_global_threshold": cls.SEMANTIC_JOB_GLOBAL_THRESHOLD,
             "semantic_field_threshold": cls.SEMANTIC_JOB_FIELD_THRESHOLD,
             "semantic_negative_weight": cls.SEMANTIC_NEGATIVE_WEIGHT,
+            "semantic_pos_top_k": cls.SEMANTIC_POS_TOP_K,
             "semantic_length_penalty": cls.SEMANTIC_LENGTH_PENALTY,
             "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
             "semantic_min_lines": cls.SEMANTIC_MIN_LINES,
