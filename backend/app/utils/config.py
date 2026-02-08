@@ -150,9 +150,10 @@ def _resolve_api_key(raw_value: str, path_value: str = "") -> tuple[str, str]:
 
     candidate = Path(value)
     if candidate.is_absolute() or value.startswith("./") or value.startswith("../"):
-        if candidate.exists() and candidate.is_file():
-            secret = _read_secret_file(candidate)
-            return secret, ("file" if secret else "missing_file")
+        if not candidate.exists() or not candidate.is_file():
+            return "", "missing_file"
+        secret = _read_secret_file(candidate)
+        return secret, ("file" if secret else "missing_file")
     return value, "direct"
 
 
