@@ -35,3 +35,25 @@ def test_summarize_groups_by_category_with_ratio():
     assert java_entry["count"] == 1
     assert py_entry["ratio"] == py_entry["count"] / total_blocks
     assert "frontend_frameworks" in summary
+
+
+class _MockConfig:
+    @staticmethod
+    def keywords_tech():
+        return {
+            "programming_languages": ["C", "VBA", "C++"],
+        }
+
+
+def test_keyword_match_with_japanese_suffix_and_ascii_boundary():
+    extractor = KeywordExtractor(config=_MockConfig)
+    hits = extractor.extract_keywords("必須: C言語での開発経験")
+    keywords = {h.keyword for h in hits}
+    assert "C" in keywords
+
+
+def test_keyword_match_with_fullwidth_and_japanese_suffix():
+    extractor = KeywordExtractor(config=_MockConfig)
+    hits = extractor.extract_keywords("ＥｘｃｅｌのＶＢＡ経験が必要です")
+    keywords = {h.keyword for h in hits}
+    assert "VBA" in keywords

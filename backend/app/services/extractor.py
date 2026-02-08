@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from typing import Dict, List, Sequence, Set
@@ -19,9 +20,15 @@ def _sorted_keywords(groups: Dict[str, List[str]]) -> List[str]:
     return sorted(keywords, key=len, reverse=True)
 
 
+def _normalize_text(value: str) -> str:
+    return unicodedata.normalize("NFKC", value)
+
+
 def _build_pattern(keyword: str) -> re.Pattern[str]:
     escaped = re.escape(keyword)
-    return re.compile(rf"(?<!\w){escaped}(?!\w)", re.IGNORECASE)
+    # Use ASCII word boundaries so terms like `C` can match `C言語` while still
+    # avoiding matches inside `COBOL` / `ABC`.
+    return re.compile(rf"(?<![A-Za-z0-9_]){escaped}(?![A-Za-z0-9_])", re.IGNORECASE)
 
 
 @dataclass
@@ -37,29 +44,30 @@ class KeywordExtractor:
         self.config = config
         self.keywords_by_category = config.keywords_tech()
         self.sorted_keywords = _sorted_keywords(self.keywords_by_category)
-        self.patterns = {kw: _build_pattern(kw) for kw in self.sorted_keywords}
+        self.normalized_keywords = {kw: _normalize_text(kw) for kw in self.sorted_keywords}
+        self.patterns = {kw: _build_pattern(self.normalized_keywords[kw]) for kw in self.sorted_keywords}
         self.keyword_to_category = self._build_keyword_category_map()
 
     def _build_keyword_category_map(self) -> Dict[str, str]:
         mapping: Dict[str, str] = {}
         for category, kws in self.keywords_by_category.items():
             for kw in kws:
-                mapping[kw.lower()] = category
+                mapping[_normalize_text(kw).lower()] = category
         return mapping
 
     def extract_keywords(self, text: str) -> List[KeywordMatch]:
         hits: List[KeywordMatch] = []
         matched_spans: List[tuple[int, int]] = []
-        lowered_text = text.lower()
+        normalized_text = _normalize_text(text)
 
         for keyword in self.sorted_keywords:
             pattern = self.patterns[keyword]
-            for match in pattern.finditer(text):
+            for match in pattern.finditer(normalized_text):
                 span = match.span()
                 if self._overlaps(span, matched_spans):
                     continue
                 matched_spans.append(span)
-                category = self.keyword_to_category.get(keyword.lower(), "unknown")
+                category = self.keyword_to_category.get(self.normalized_keywords[keyword].lower(), "unknown")
                 hits.append(KeywordMatch(keyword=keyword, category=category))
                 break  # count once per block for this keyword
         return hits

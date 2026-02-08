@@ -235,17 +235,34 @@ class PipelineConfigService:
         cfg.SEMANTIC_TRIM_TAIL_POS_THRESHOLD = float(
             search.get("trim_tail_pos_threshold", cfg.SEMANTIC_TRIM_TAIL_POS_THRESHOLD)
         )
+        cfg.SEMANTIC_TRIM_TAIL_MARGIN = float(
+            search.get("trim_tail_margin", cfg.SEMANTIC_TRIM_TAIL_MARGIN)
+        )
         cfg.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD = float(
             search.get("trim_head_neg_threshold", cfg.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD)
         )
         cfg.SEMANTIC_TRIM_HEAD_POS_THRESHOLD = float(
             search.get("trim_head_pos_threshold", cfg.SEMANTIC_TRIM_HEAD_POS_THRESHOLD)
         )
+        cfg.SEMANTIC_TRIM_HEAD_MARGIN = float(
+            search.get("trim_head_margin", cfg.SEMANTIC_TRIM_HEAD_MARGIN)
+        )
+        cfg.SEMANTIC_TRIM_NEG_WEIGHT_LINE = float(
+            search.get("trim_neg_weight_line", cfg.SEMANTIC_TRIM_NEG_WEIGHT_LINE)
+        )
+        cfg.SEMANTIC_TRIM_POS_WEIGHT_LINE = float(
+            search.get("trim_pos_weight_line", cfg.SEMANTIC_TRIM_POS_WEIGHT_LINE)
+        )
+        cfg.SEMANTIC_MAX_TAIL_TRIM = int(search.get("max_tail_trim", cfg.SEMANTIC_MAX_TAIL_TRIM))
+        cfg.SEMANTIC_MAX_HEAD_TRIM = int(search.get("max_head_trim", cfg.SEMANTIC_MAX_HEAD_TRIM))
         cfg.SEMANTIC_BOUNDARY_NEG_THRESHOLD = float(
             search.get("boundary_neg_threshold", cfg.SEMANTIC_BOUNDARY_NEG_THRESHOLD)
         )
         cfg.SEMANTIC_BOUNDARY_POS_THRESHOLD = float(
             search.get("boundary_pos_threshold", cfg.SEMANTIC_BOUNDARY_POS_THRESHOLD)
+        )
+        cfg.SEMANTIC_BOUNDARY_MARGIN = float(
+            search.get("boundary_margin", cfg.SEMANTIC_BOUNDARY_MARGIN)
         )
         cfg.SEMANTIC_BOUNDARY_TAIL_RUN = int(search.get("boundary_tail_run", cfg.SEMANTIC_BOUNDARY_TAIL_RUN))
         cfg.SEMANTIC_BOUNDARY_HEAD_RUN = int(search.get("boundary_head_run", cfg.SEMANTIC_BOUNDARY_HEAD_RUN))

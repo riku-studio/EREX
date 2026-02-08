@@ -389,7 +389,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({ config, loading, onRef
           {/* Section 4: Functional Objects */}
           {/* Using type assertions to access configuration objects that may be reported as missing on PipelineConfig */}
           <KeyValueEditor 
-            label="Semantic Templates" 
+            label="Semantic Search Config" 
             data={(localConfig as any).semantic_templates || {}} 
             onChange={(semantic_templates) => handleUpdate({ semantic_templates })} 
             icon={<Hash className="w-4 h-4 text-brand-500" />}
