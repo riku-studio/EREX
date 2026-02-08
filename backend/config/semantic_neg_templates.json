@@ -98,5 +98,45 @@
     "id": "neg_20",
     "category": "simple_acknowledgement",
     "text": "ご確認ありがとうございます。承知いたしました。引き続きよろしくお願いいたします。"
+  },
+  {
+    "id": "neg_21",
+    "category": "company_signature",
+    "text": "株式会社〇〇です。担当：営業部"
+  },
+  {
+    "id": "neg_22",
+    "category": "tail_polite",
+    "text": "ご確認よろしくお願いいたします。"
+  },
+  {
+    "id": "neg_23",
+    "category": "no_redistribution_notice",
+    "text": "無断転送・転載はお控えください。"
+  },
+  {
+    "id": "neg_24",
+    "category": "contact_block",
+    "text": "連絡先：メール・電話"
+  },
+  {
+    "id": "neg_25",
+    "category": "commercial_flow_note",
+    "text": "商流・並行・単金の記載をお願いします。"
+  },
+  {
+    "id": "neg_26",
+    "category": "company_overview_header",
+    "text": "会社概要"
+  },
+  {
+    "id": "neg_27",
+    "category": "url_footer",
+    "text": "URL: https://example.com"
+  },
+  {
+    "id": "neg_28",
+    "category": "contact_signature",
+    "text": "担当：営業部 連絡先"
   }
 ]

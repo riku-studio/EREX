@@ -60,14 +60,14 @@
   - `search.pos_top_k=3`
   - `search.negative_weight=0.15`
   - `search.length_penalty=0.0`
-  - `search.length_reward=0.03`
-  - `search.center_weight=0.1`
+  - `search.length_reward=0.01`
+  - `search.center_weight=0.0`
   - `search.min_lines=2`
   - `search.window_max_lines=44`
-  - `search.cluster_delta=0.15`
+  - `search.cluster_delta=0.18`
   - `search.cluster_min_windows=6`
   - `search.cluster_overlap_only=true`
-  - `search.trim_tail_neg_threshold=0.4`
+  - `search.trim_tail_neg_threshold=0.35`
   - `search.trim_tail_pos_threshold=0.34`
   - `search.trim_head_neg_threshold=0.55`
   - `search.trim_head_pos_threshold=0.3`
@@ -80,6 +80,18 @@
   - `line_f1=0.8557`
   - `exact_rate=0.1364`
   - `mean_iou=0.7444`
+
+## 起止行差评估（你提出的新口径）
+- 对每封邮件：
+  - 在原文 `block_text` 中定位 `recruitment_text` 的 `(gold_start, gold_end)`；
+  - 在原文 `block_text` 中定位 `semantic_text` 的 `(pred_start, pred_end)`；
+  - 计算 `line_diff = |pred_start-gold_start| + |pred_end-gold_end|`。
+- 全量目标：最小化 `total_line_diff = Σ line_diff`。
+- 本轮最优（含增强负模板）：
+  - `total_line_diff=795`
+  - `avg_line_diff=5.1623`
+  - `exact_match_rows=25/154`
+  - `exact_rate=0.1623`
 
 ## 如何获取最优规则/超参
 1. 构造 gold 标注：
