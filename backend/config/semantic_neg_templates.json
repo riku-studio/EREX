@@ -138,5 +138,20 @@
     "id": "neg_28",
     "category": "contact_signature",
     "text": "担当：営業部 連絡先"
+  },
+  {
+    "id": "neg_29",
+    "category": "customize",
+    "text": "株式会社〇〇システム"
+  },
+  {
+    "id": "neg_30",
+    "category": "customize",
+    "text": "システム営業部 〇〇"
+  },
+  {
+    "id": "neg_31",
+    "category": "customize",
+    "text": "-・-・-・-・-・-・-・-・-・-・-"
   }
 ]
