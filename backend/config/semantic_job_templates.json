@@ -17,7 +17,11 @@
     "trim_tail_neg_threshold": 0.35,
     "trim_tail_pos_threshold": 0.34,
     "trim_head_neg_threshold": 0.55,
-    "trim_head_pos_threshold": 0.3
+    "trim_head_pos_threshold": 0.3,
+    "boundary_neg_threshold": 0.5,
+    "boundary_pos_threshold": 0.32,
+    "boundary_tail_run": 0,
+    "boundary_head_run": 0
   },
   "fields": {
     "overview": [

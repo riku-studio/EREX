@@ -171,6 +171,18 @@ class Config:
     SEMANTIC_TRIM_HEAD_POS_THRESHOLD = float(
         os.getenv("SEMANTIC_TRIM_HEAD_POS_THRESHOLD", _SEMANTIC_SEARCH.get("trim_head_pos_threshold", 0.3))
     )
+    SEMANTIC_BOUNDARY_NEG_THRESHOLD = float(
+        os.getenv("SEMANTIC_BOUNDARY_NEG_THRESHOLD", _SEMANTIC_SEARCH.get("boundary_neg_threshold", 0.5))
+    )
+    SEMANTIC_BOUNDARY_POS_THRESHOLD = float(
+        os.getenv("SEMANTIC_BOUNDARY_POS_THRESHOLD", _SEMANTIC_SEARCH.get("boundary_pos_threshold", 0.32))
+    )
+    SEMANTIC_BOUNDARY_TAIL_RUN = int(
+        os.getenv("SEMANTIC_BOUNDARY_TAIL_RUN", _SEMANTIC_SEARCH.get("boundary_tail_run", 0))
+    )
+    SEMANTIC_BOUNDARY_HEAD_RUN = int(
+        os.getenv("SEMANTIC_BOUNDARY_HEAD_RUN", _SEMANTIC_SEARCH.get("boundary_head_run", 0))
+    )
     SEMANTIC_WINDOW_MAX_LINES = int(os.getenv("SEMANTIC_WINDOW_MAX_LINES", _SEMANTIC_SEARCH.get("window_max_lines", 24)))
     SEMANTIC_MIN_LINES = int(os.getenv("SEMANTIC_MIN_LINES", _SEMANTIC_SEARCH.get("min_lines", 2)))
 
@@ -254,6 +266,10 @@ class Config:
             "semantic_trim_tail_pos_threshold": cls.SEMANTIC_TRIM_TAIL_POS_THRESHOLD,
             "semantic_trim_head_neg_threshold": cls.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD,
             "semantic_trim_head_pos_threshold": cls.SEMANTIC_TRIM_HEAD_POS_THRESHOLD,
+            "semantic_boundary_neg_threshold": cls.SEMANTIC_BOUNDARY_NEG_THRESHOLD,
+            "semantic_boundary_pos_threshold": cls.SEMANTIC_BOUNDARY_POS_THRESHOLD,
+            "semantic_boundary_tail_run": cls.SEMANTIC_BOUNDARY_TAIL_RUN,
+            "semantic_boundary_head_run": cls.SEMANTIC_BOUNDARY_HEAD_RUN,
             "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
             "semantic_min_lines": cls.SEMANTIC_MIN_LINES,
             "keywords_tech_path": cls.KEYWORDS_TECH_PATH,

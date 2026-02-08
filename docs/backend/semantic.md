@@ -28,6 +28,10 @@
     - `trim_tail_pos_threshold`
     - `trim_head_neg_threshold`
     - `trim_head_pos_threshold`
+    - `boundary_neg_threshold`
+    - `boundary_pos_threshold`
+    - `boundary_tail_run`
+    - `boundary_head_run`
     - `window_max_lines`
     - `min_lines`
   - `fields`: `{ [field: string]: string[] }`，字段级模板列表（如 overview / work_content / skill / working_conditions / contract / restriction）。
@@ -73,6 +77,10 @@
   - `search.trim_tail_pos_threshold=0.34`
   - `search.trim_head_neg_threshold=0.55`
   - `search.trim_head_pos_threshold=0.3`
+  - `search.boundary_neg_threshold=0.5`
+  - `search.boundary_pos_threshold=0.32`
+  - `search.boundary_tail_run=0`（默认关闭）
+  - `search.boundary_head_run=0`（默认关闭）
 
 ## 本轮验证结果（`tests/out_recruitment_extract.csv`）
 - 评估口径：`block_text` 上预测窗口 vs `recruitment_text` 金标窗口（行级）。
@@ -94,6 +102,7 @@
   - `avg_line_diff=5.1558`
   - `exact_match_rows=26/154`
   - `exact_rate=0.1688`
+- 说明：行级边界 run 判定已实现为可选项，但在当前数据集开启后会过裁剪，`total_line_diff` 反而上升（实验最优约 `817`），因此默认关闭。
 
 ## 如何获取最优规则/超参
 1. 构造 gold 标注：

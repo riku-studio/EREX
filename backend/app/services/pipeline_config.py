@@ -241,6 +241,14 @@ class PipelineConfigService:
         cfg.SEMANTIC_TRIM_HEAD_POS_THRESHOLD = float(
             search.get("trim_head_pos_threshold", cfg.SEMANTIC_TRIM_HEAD_POS_THRESHOLD)
         )
+        cfg.SEMANTIC_BOUNDARY_NEG_THRESHOLD = float(
+            search.get("boundary_neg_threshold", cfg.SEMANTIC_BOUNDARY_NEG_THRESHOLD)
+        )
+        cfg.SEMANTIC_BOUNDARY_POS_THRESHOLD = float(
+            search.get("boundary_pos_threshold", cfg.SEMANTIC_BOUNDARY_POS_THRESHOLD)
+        )
+        cfg.SEMANTIC_BOUNDARY_TAIL_RUN = int(search.get("boundary_tail_run", cfg.SEMANTIC_BOUNDARY_TAIL_RUN))
+        cfg.SEMANTIC_BOUNDARY_HEAD_RUN = int(search.get("boundary_head_run", cfg.SEMANTIC_BOUNDARY_HEAD_RUN))
         cfg.SEMANTIC_WINDOW_MAX_LINES = int(search.get("window_max_lines", cfg.SEMANTIC_WINDOW_MAX_LINES))
         cfg.SEMANTIC_MIN_LINES = int(search.get("min_lines", cfg.SEMANTIC_MIN_LINES))
 

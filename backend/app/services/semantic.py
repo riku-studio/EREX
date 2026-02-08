@@ -104,6 +104,10 @@ class SemanticExtractor:
         self.trim_tail_pos_threshold = Config.SEMANTIC_TRIM_TAIL_POS_THRESHOLD
         self.trim_head_neg_threshold = Config.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD
         self.trim_head_pos_threshold = Config.SEMANTIC_TRIM_HEAD_POS_THRESHOLD
+        self.boundary_neg_threshold = Config.SEMANTIC_BOUNDARY_NEG_THRESHOLD
+        self.boundary_pos_threshold = Config.SEMANTIC_BOUNDARY_POS_THRESHOLD
+        self.boundary_tail_run = max(0, Config.SEMANTIC_BOUNDARY_TAIL_RUN)
+        self.boundary_head_run = max(0, Config.SEMANTIC_BOUNDARY_HEAD_RUN)
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
         self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
 
@@ -252,6 +256,71 @@ class SemanticExtractor:
             return None, None
         return s, e
 
+    def _line_looks_negative_boundary(
+        self,
+        text: str,
+        pos_score: float,
+        neg_score: float,
+    ) -> bool:
+        if self._HEAD_KEEP_RE.search(text):
+            return False
+        if self._TAIL_NEG_RE.search(text):
+            return True
+        return bool(neg_score >= self.boundary_neg_threshold and pos_score <= self.boundary_pos_threshold)
+
+    def _refine_boundary_by_negative_runs(
+        self,
+        lines: Sequence[str],
+        line_pos_scores: np.ndarray,
+        line_neg_scores: np.ndarray,
+        start_line: int,
+        end_line: int,
+    ) -> Tuple[Optional[int], Optional[int]]:
+        s = start_line
+        e = end_line
+        if s > e:
+            return None, None
+
+        # Tail boundary: cut at the first strong negative run.
+        run = self.boundary_tail_run
+        if run > 0:
+            stop_at: Optional[int] = None
+            for idx in range(s, e - run + 2):
+                ok = True
+                for j in range(idx, idx + run):
+                    if not self._line_looks_negative_boundary(lines[j], float(line_pos_scores[j]), float(line_neg_scores[j])):
+                        ok = False
+                        break
+                if ok:
+                    stop_at = idx
+                    break
+            if stop_at is not None:
+                e = stop_at - 1
+
+        # Head boundary: drop a greeting/negative run at the front if present.
+        head_run = self.boundary_head_run
+        if head_run > 0 and s <= e:
+            while s + head_run - 1 <= e:
+                ok = True
+                for j in range(s, s + head_run):
+                    text = lines[j]
+                    cond = self._HEAD_GREET_RE.search(text) or self._line_looks_negative_boundary(
+                        text,
+                        float(line_pos_scores[j]),
+                        float(line_neg_scores[j]),
+                    )
+                    if not cond:
+                        ok = False
+                        break
+                if ok:
+                    s += head_run
+                else:
+                    break
+
+        if e < s:
+            return None, None
+        return s, e
+
     def _search_best_window(self, line_embeddings: np.ndarray) -> Tuple[Optional[Tuple[int, int]], float]:
         total_lines = line_embeddings.shape[0]
         if total_lines == 0:
@@ -389,6 +458,26 @@ class SemanticExtractor:
                 continue
 
             start_line, end_line = trimmed_start, trimmed_end
+            refined_start, refined_end = self._refine_boundary_by_negative_runs(
+                lines,
+                line_pos_scores,
+                line_neg_scores,
+                start_line,
+                end_line,
+            )
+            if refined_start is None or refined_end is None:
+                results.append(
+                    SemanticResult(
+                        text="",
+                        score=max(0.0, float(best_score)),
+                        start_line=None,
+                        end_line=None,
+                        matched=False,
+                        line_scores=[0.0 for _ in lines],
+                    )
+                )
+                continue
+            start_line, end_line = refined_start, refined_end
             matched_text = "\n".join(lines[start_line : end_line + 1]).strip()
             line_scores = [0.0 for _ in lines]
             for idx in range(start_line, end_line + 1):
