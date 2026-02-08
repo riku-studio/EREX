@@ -2,34 +2,11 @@
   "context_radius": 1,
   "global_threshold": 0.55,
   "field_threshold": 0.4,
-  "global": [
-    "求人情報のご案内",
-    "案件情報のご共有",
-    "エンジニア募集のご連絡",
-    "募集要項の概要",
-    "案件に参画いただける方を探しております",
-    "開発案件のご提案",
-    "スキル要件を満たす方をご紹介ください"
-  ],
-  "negative": [
-    "いつもお世話になっております",
-    "ご確認よろしくお願いいたします",
-    "何卒よろしくお願い申し上げます",
-    "配信停止をご希望の方はご連絡ください",
-    "本メールは自動送信されています",
-    "署名",
-    "会社名",
-    "電話番号",
-    "以上、よろしくお願いいたします"
-  ],
   "search": {
     "negative_weight": 0.35,
     "length_penalty": 0.02,
     "window_max_lines": 24,
-    "min_lines": 2,
-    "candidate_top_n": 8,
-    "candidate_radius": 20,
-    "candidate_min_score": 0.05
+    "min_lines": 2
   },
   "fields": {
     "overview": [

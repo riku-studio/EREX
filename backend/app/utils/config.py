@@ -56,6 +56,14 @@ def _default_semantic_templates_path() -> str:
     return str(CONFIG_ROOT / "semantic_job_templates.json")
 
 
+def _default_semantic_pos_templates_path() -> str:
+    return str(CONFIG_ROOT / "semantic_pos_templates.json")
+
+
+def _default_semantic_neg_templates_path() -> str:
+    return str(CONFIG_ROOT / "semantic_neg_templates.json")
+
+
 def _default_keywords_path() -> str:
     return str(CONFIG_ROOT / "keywords_tech.json")
 
@@ -65,6 +73,14 @@ def _load_json(path: str) -> dict:
         return json.loads(Path(path).read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def _load_json_array(path: str) -> list:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
 
 
 class Config:
@@ -105,7 +121,11 @@ class Config:
     SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
     SEMANTIC_SHOW_PROGRESS = os.getenv("SEMANTIC_SHOW_PROGRESS", "false").lower() == "true"
     SEMANTIC_TEMPLATES_PATH = os.getenv("SEMANTIC_TEMPLATES_PATH", _default_semantic_templates_path())
+    SEMANTIC_POS_TEMPLATES_PATH = os.getenv("SEMANTIC_POS_TEMPLATES_PATH", _default_semantic_pos_templates_path())
+    SEMANTIC_NEG_TEMPLATES_PATH = os.getenv("SEMANTIC_NEG_TEMPLATES_PATH", _default_semantic_neg_templates_path())
     _SEMANTIC_TEMPLATES = _load_json(SEMANTIC_TEMPLATES_PATH)
+    _SEMANTIC_POS_TEMPLATES = _load_json_array(SEMANTIC_POS_TEMPLATES_PATH)
+    _SEMANTIC_NEG_TEMPLATES = _load_json_array(SEMANTIC_NEG_TEMPLATES_PATH)
     SEMANTIC_CONTEXT_RADIUS = int(
         os.getenv("SEMANTIC_CONTEXT_RADIUS", _SEMANTIC_TEMPLATES.get("context_radius", 1))
     )
@@ -120,13 +140,6 @@ class Config:
     SEMANTIC_LENGTH_PENALTY = float(os.getenv("SEMANTIC_LENGTH_PENALTY", _SEMANTIC_SEARCH.get("length_penalty", 0.02)))
     SEMANTIC_WINDOW_MAX_LINES = int(os.getenv("SEMANTIC_WINDOW_MAX_LINES", _SEMANTIC_SEARCH.get("window_max_lines", 24)))
     SEMANTIC_MIN_LINES = int(os.getenv("SEMANTIC_MIN_LINES", _SEMANTIC_SEARCH.get("min_lines", 2)))
-    SEMANTIC_CANDIDATE_TOP_N = int(os.getenv("SEMANTIC_CANDIDATE_TOP_N", _SEMANTIC_SEARCH.get("candidate_top_n", 8)))
-    SEMANTIC_CANDIDATE_RADIUS = int(
-        os.getenv("SEMANTIC_CANDIDATE_RADIUS", _SEMANTIC_SEARCH.get("candidate_radius", 20))
-    )
-    SEMANTIC_CANDIDATE_MIN_SCORE = float(
-        os.getenv("SEMANTIC_CANDIDATE_MIN_SCORE", _SEMANTIC_SEARCH.get("candidate_min_score", 0.05))
-    )
 
     # Keyword extractor
     KEYWORDS_TECH_PATH = os.getenv("KEYWORDS_TECH_PATH", _default_keywords_path())
@@ -190,6 +203,8 @@ class Config:
             "semantic_device": cls.semantic_runtime_device(),
             "semantic_show_progress": cls.SEMANTIC_SHOW_PROGRESS,
             "semantic_templates_path": cls.SEMANTIC_TEMPLATES_PATH,
+            "semantic_pos_templates_path": cls.SEMANTIC_POS_TEMPLATES_PATH,
+            "semantic_neg_templates_path": cls.SEMANTIC_NEG_TEMPLATES_PATH,
             "semantic_context_radius": cls.SEMANTIC_CONTEXT_RADIUS,
             "semantic_global_threshold": cls.SEMANTIC_JOB_GLOBAL_THRESHOLD,
             "semantic_field_threshold": cls.SEMANTIC_JOB_FIELD_THRESHOLD,
@@ -197,9 +212,6 @@ class Config:
             "semantic_length_penalty": cls.SEMANTIC_LENGTH_PENALTY,
             "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
             "semantic_min_lines": cls.SEMANTIC_MIN_LINES,
-            "semantic_candidate_top_n": cls.SEMANTIC_CANDIDATE_TOP_N,
-            "semantic_candidate_radius": cls.SEMANTIC_CANDIDATE_RADIUS,
-            "semantic_candidate_min_score": cls.SEMANTIC_CANDIDATE_MIN_SCORE,
             "keywords_tech_path": cls.KEYWORDS_TECH_PATH,
             "line_filter_enabled": cls.ENABLE_LINE_FILTER,
             "line_filter_config_path": cls.LINE_FILTER_CONFIG_PATH,
@@ -234,8 +246,17 @@ class Config:
 
     @classmethod
     def semantic_global_templates(cls) -> list[str]:
-        data = cls._SEMANTIC_TEMPLATES.get("global", [])
-        return list(data) if isinstance(data, list) else []
+        templates: list[str] = []
+        for item in cls._SEMANTIC_POS_TEMPLATES:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                text = item["text"].strip()
+                if text:
+                    templates.append(text)
+            elif isinstance(item, str):
+                text = item.strip()
+                if text:
+                    templates.append(text)
+        return templates
 
     @classmethod
     def semantic_field_templates(cls) -> dict[str, list[str]]:
@@ -249,8 +270,17 @@ class Config:
 
     @classmethod
     def semantic_negative_templates(cls) -> list[str]:
-        data = cls._SEMANTIC_TEMPLATES.get("negative", [])
-        return list(data) if isinstance(data, list) else []
+        templates: list[str] = []
+        for item in cls._SEMANTIC_NEG_TEMPLATES:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                text = item["text"].strip()
+                if text:
+                    templates.append(text)
+            elif isinstance(item, str):
+                text = item.strip()
+                if text:
+                    templates.append(text)
+        return templates
 
     @classmethod
     def keywords_tech(cls) -> dict[str, list[str]]:

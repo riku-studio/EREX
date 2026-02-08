@@ -107,7 +107,7 @@ def test_best_window_is_chosen_for_multi_line_content():
                     vectors.append(np.array([0.0, 0.0]))
             return vectors
 
-    body = "greet one\njobA one\njobB two\ngreet two"
+    body = "NEG one\njobA one\njobB two\nNEG two"
     extractor = SemanticExtractor(
         model=WeightedModel(),
         global_templates=["GLOBAL"],

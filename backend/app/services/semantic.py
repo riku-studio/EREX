@@ -84,9 +84,6 @@ class SemanticExtractor:
         self.length_penalty = Config.SEMANTIC_LENGTH_PENALTY
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
         self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
-        self.candidate_top_n = max(1, Config.SEMANTIC_CANDIDATE_TOP_N)
-        self.candidate_radius = max(1, Config.SEMANTIC_CANDIDATE_RADIUS)
-        self.candidate_min_score = Config.SEMANTIC_CANDIDATE_MIN_SCORE
 
     def _embed(self, sentences: Sequence[str]) -> np.ndarray:
         if not sentences:
@@ -124,24 +121,6 @@ class SemanticExtractor:
                 ", ".join(f"{k}:{v:.3f}" for k, v in max_scores.items()),
             )
 
-    def _line_scores(self, line_embeddings: np.ndarray) -> np.ndarray:
-        if line_embeddings.size == 0:
-            return np.asarray([], dtype=float)
-        pos_scores = np.max(line_embeddings @ self.global_embeddings.T, axis=1) if self.global_embeddings.size else 0.0
-        neg_scores = (
-            np.max(line_embeddings @ self.negative_embeddings.T, axis=1) if self.negative_embeddings.size else 0.0
-        )
-        return np.asarray(pos_scores, dtype=float) - (self.negative_weight * np.asarray(neg_scores, dtype=float))
-
-    def _candidate_centers(self, line_scores: np.ndarray) -> List[int]:
-        if line_scores.size == 0:
-            return []
-        ranked = sorted(enumerate(line_scores.tolist()), key=lambda item: item[1], reverse=True)
-        centers = [idx for idx, score in ranked if score >= self.candidate_min_score][: self.candidate_top_n]
-        if not centers and ranked:
-            centers = [ranked[0][0]]
-        return centers
-
     def _window_embedding(self, prefix: np.ndarray, start: int, end: int) -> np.ndarray:
         window_sum = prefix[end + 1] - prefix[start]
         window_len = max(1, end - start + 1)
@@ -156,44 +135,26 @@ class SemanticExtractor:
         neg = self._max_sim(window_embedding, self.negative_embeddings)
         return pos - (self.negative_weight * neg) - (self.length_penalty * float(np.log1p(window_len)))
 
-    def _search_best_window(self, line_embeddings: np.ndarray, line_scores: np.ndarray) -> Tuple[Optional[Tuple[int, int]], float]:
+    def _search_best_window(self, line_embeddings: np.ndarray) -> Tuple[Optional[Tuple[int, int]], float]:
         total_lines = line_embeddings.shape[0]
         if total_lines == 0:
             return None, 0.0
 
         max_lines = min(self.window_max_lines, total_lines)
         min_lines = min(self.min_lines, max_lines)
-        centers = self._candidate_centers(line_scores)
-
-        windows: set[Tuple[int, int]] = set()
-        for center in centers:
-            left = max(0, center - self.candidate_radius)
-            right = min(total_lines - 1, center + self.candidate_radius)
-            for length in range(min_lines, max_lines + 1):
-                start_lo = max(left, center - length + 1)
-                start_hi = min(center, right - length + 1)
-                if start_lo > start_hi:
-                    continue
-                for start in range(start_lo, start_hi + 1):
-                    windows.add((start, start + length - 1))
-
-        if not windows:
-            for length in range(min_lines, max_lines + 1):
-                for start in range(0, total_lines - length + 1):
-                    windows.add((start, start + length - 1))
-
         prefix = np.vstack([np.zeros((1, line_embeddings.shape[1]), dtype=float), np.cumsum(line_embeddings, axis=0)])
         best_window: Optional[Tuple[int, int]] = None
         best_score = -1e9
-        best_line_sum = -1e9
-        for start, end in windows:
-            window_vec = self._window_embedding(prefix, start, end)
-            score = self._window_score(window_vec, end - start + 1)
-            window_line_sum = float(np.sum(line_scores[start : end + 1]))
-            if score > best_score or (abs(score - best_score) <= 1e-9 and window_line_sum > best_line_sum):
-                best_score = score
-                best_line_sum = window_line_sum
-                best_window = (start, end)
+        best_len = 10**9
+        for length in range(min_lines, max_lines + 1):
+            for start in range(0, total_lines - length + 1):
+                end = start + length - 1
+                window_vec = self._window_embedding(prefix, start, end)
+                score = self._window_score(window_vec, length)
+                if score > best_score or (abs(score - best_score) <= 1e-9 and length < best_len):
+                    best_score = score
+                    best_len = length
+                    best_window = (start, end)
 
         return best_window, float(best_score if best_score > -1e8 else 0.0)
 
@@ -226,8 +187,7 @@ class SemanticExtractor:
                 continue
 
             line_embeddings = all_line_embeddings[start:end]
-            line_scores = self._line_scores(line_embeddings)
-            best_window, best_score = self._search_best_window(line_embeddings, line_scores)
+            best_window, best_score = self._search_best_window(line_embeddings)
             best_scores.append(best_score)
 
             if best_window is None or best_score < self.global_threshold:
@@ -238,13 +198,16 @@ class SemanticExtractor:
                         start_line=None,
                         end_line=None,
                         matched=False,
-                        line_scores=[float(v) for v in line_scores.tolist()],
+                        line_scores=[0.0 for _ in lines],
                     )
                 )
                 continue
 
             start_line, end_line = best_window
             matched_text = "\n".join(lines[start_line : end_line + 1]).strip()
+            line_scores = [0.0 for _ in lines]
+            for idx in range(start_line, end_line + 1):
+                line_scores[idx] = float(best_score)
             results.append(
                 SemanticResult(
                     text=matched_text,
@@ -252,7 +215,7 @@ class SemanticExtractor:
                     start_line=start_line,
                     end_line=end_line,
                     matched=True,
-                    line_scores=[float(v) for v in line_scores.tolist()],
+                    line_scores=line_scores,
                 )
             )
 
