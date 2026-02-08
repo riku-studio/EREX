@@ -153,8 +153,12 @@ class SemanticExtractor:
         if total_lines == 0:
             return None, 0.0
 
+        # Keep minimum window length strict to stay consistent with tuned rules.
+        if total_lines < self.min_lines:
+            return None, 0.0
+
         max_lines = min(self.window_max_lines, total_lines)
-        min_lines = min(self.min_lines, max_lines)
+        min_lines = self.min_lines
         prefix = np.vstack([np.zeros((1, line_embeddings.shape[1]), dtype=float), np.cumsum(line_embeddings, axis=0)])
         best_window: Optional[Tuple[int, int]] = None
         best_score = -1e9

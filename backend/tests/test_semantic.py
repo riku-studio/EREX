@@ -78,7 +78,7 @@ def test_negative_templates_reduce_greeting_bias():
 
 
 def test_extract_batch_returns_results_per_body():
-    bodies = ["greet\njob line", "greet only"]
+    bodies = ["greet\njob line\ncontract line", "greet only"]
     extractor = SemanticExtractor(
         model=FakeModel(),
         global_templates=["GLOBAL"],
