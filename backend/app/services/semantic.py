@@ -57,15 +57,9 @@ def prepare_semantic_input(body: str, line_filter: LineFilter | None = None) -> 
 
 
 class SemanticExtractor:
-    _TAIL_NEG_RE = re.compile(
-        r"(株式会社|有限会社|会社概要|担当|連絡先|電話|TEL|Mail|E-mail|URL|https?://|www\.|"
-        r"商流|無断転送|掲載はお控え|ご紹介の際は|よろしくお願いいたします|ご確認ください)",
-        re.IGNORECASE,
-    )
     _HEAD_KEEP_RE = re.compile(
         r"(案件名|案件概要|概要|募集|業務内容|ポジション|プロジェクト|担当工程|必須スキル|勤務地|作業場所)"
     )
-    _HEAD_GREET_RE = re.compile(r"^(お世話になっております|いつもお世話になっております|ご担当者様|各位)")
 
     def __init__(
         self,
@@ -102,10 +96,17 @@ class SemanticExtractor:
         self.cluster_overlap_only = Config.SEMANTIC_CLUSTER_OVERLAP_ONLY
         self.trim_tail_neg_threshold = Config.SEMANTIC_TRIM_TAIL_NEG_THRESHOLD
         self.trim_tail_pos_threshold = Config.SEMANTIC_TRIM_TAIL_POS_THRESHOLD
+        self.trim_tail_margin = Config.SEMANTIC_TRIM_TAIL_MARGIN
         self.trim_head_neg_threshold = Config.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD
         self.trim_head_pos_threshold = Config.SEMANTIC_TRIM_HEAD_POS_THRESHOLD
+        self.trim_head_margin = Config.SEMANTIC_TRIM_HEAD_MARGIN
+        self.trim_neg_weight_line = Config.SEMANTIC_TRIM_NEG_WEIGHT_LINE
+        self.trim_pos_weight_line = Config.SEMANTIC_TRIM_POS_WEIGHT_LINE
+        self.max_tail_trim = max(0, Config.SEMANTIC_MAX_TAIL_TRIM)
+        self.max_head_trim = max(0, Config.SEMANTIC_MAX_HEAD_TRIM)
         self.boundary_neg_threshold = Config.SEMANTIC_BOUNDARY_NEG_THRESHOLD
         self.boundary_pos_threshold = Config.SEMANTIC_BOUNDARY_POS_THRESHOLD
+        self.boundary_margin = Config.SEMANTIC_BOUNDARY_MARGIN
         self.boundary_tail_run = max(0, Config.SEMANTIC_BOUNDARY_TAIL_RUN)
         self.boundary_head_run = max(0, Config.SEMANTIC_BOUNDARY_HEAD_RUN)
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
@@ -217,21 +218,29 @@ class SemanticExtractor:
     ) -> Tuple[Optional[int], Optional[int]]:
         s = start_line
         e = end_line
+        eff_pos = line_pos_scores * self.trim_pos_weight_line
+        eff_neg = line_neg_scores * self.trim_neg_weight_line
+        margin = eff_neg - eff_pos
+
+        tail_trimmed = 0
+        head_trimmed = 0
 
         while e >= s:
             text = lines[e]
             if self._HEAD_KEEP_RE.search(text):
                 break
-            if self._TAIL_NEG_RE.search(text):
-                e -= 1
-                continue
+            if tail_trimmed >= self.max_tail_trim:
+                break
             if (
-                e < line_neg_scores.shape[0]
-                and line_neg_scores[e] >= self.trim_tail_neg_threshold
-                and e < line_pos_scores.shape[0]
-                and line_pos_scores[e] <= self.trim_tail_pos_threshold
+                e < eff_neg.shape[0]
+                and eff_neg[e] >= self.trim_tail_neg_threshold
+                and e < eff_pos.shape[0]
+                and eff_pos[e] <= self.trim_tail_pos_threshold
+                and e < margin.shape[0]
+                and margin[e] >= self.trim_tail_margin
             ):
                 e -= 1
+                tail_trimmed += 1
                 continue
             break
 
@@ -239,16 +248,18 @@ class SemanticExtractor:
             text = lines[s]
             if self._HEAD_KEEP_RE.search(text):
                 break
-            if self._HEAD_GREET_RE.search(text):
-                s += 1
-                continue
+            if head_trimmed >= self.max_head_trim:
+                break
             if (
-                s < line_neg_scores.shape[0]
-                and line_neg_scores[s] >= self.trim_head_neg_threshold
-                and s < line_pos_scores.shape[0]
-                and line_pos_scores[s] <= self.trim_head_pos_threshold
+                s < eff_neg.shape[0]
+                and eff_neg[s] >= self.trim_head_neg_threshold
+                and s < eff_pos.shape[0]
+                and eff_pos[s] <= self.trim_head_pos_threshold
+                and s < margin.shape[0]
+                and margin[s] >= self.trim_head_margin
             ):
                 s += 1
+                head_trimmed += 1
                 continue
             break
 
@@ -264,9 +275,12 @@ class SemanticExtractor:
     ) -> bool:
         if self._HEAD_KEEP_RE.search(text):
             return False
-        if self._TAIL_NEG_RE.search(text):
-            return True
-        return bool(neg_score >= self.boundary_neg_threshold and pos_score <= self.boundary_pos_threshold)
+        margin = neg_score - pos_score
+        return bool(
+            neg_score >= self.boundary_neg_threshold
+            and pos_score <= self.boundary_pos_threshold
+            and margin >= self.boundary_margin
+        )
 
     def _refine_boundary_by_negative_runs(
         self,
@@ -280,6 +294,8 @@ class SemanticExtractor:
         e = end_line
         if s > e:
             return None, None
+        eff_pos = line_pos_scores * self.trim_pos_weight_line
+        eff_neg = line_neg_scores * self.trim_neg_weight_line
 
         # Tail boundary: cut at the first strong negative run.
         run = self.boundary_tail_run
@@ -288,7 +304,7 @@ class SemanticExtractor:
             for idx in range(s, e - run + 2):
                 ok = True
                 for j in range(idx, idx + run):
-                    if not self._line_looks_negative_boundary(lines[j], float(line_pos_scores[j]), float(line_neg_scores[j])):
+                    if not self._line_looks_negative_boundary(lines[j], float(eff_pos[j]), float(eff_neg[j])):
                         ok = False
                         break
                 if ok:
@@ -304,11 +320,7 @@ class SemanticExtractor:
                 ok = True
                 for j in range(s, s + head_run):
                     text = lines[j]
-                    cond = self._HEAD_GREET_RE.search(text) or self._line_looks_negative_boundary(
-                        text,
-                        float(line_pos_scores[j]),
-                        float(line_neg_scores[j]),
-                    )
+                    cond = self._line_looks_negative_boundary(text, float(eff_pos[j]), float(eff_neg[j]))
                     if not cond:
                         ok = False
                         break

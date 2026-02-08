@@ -165,17 +165,38 @@ class Config:
     SEMANTIC_TRIM_TAIL_POS_THRESHOLD = float(
         os.getenv("SEMANTIC_TRIM_TAIL_POS_THRESHOLD", _SEMANTIC_SEARCH.get("trim_tail_pos_threshold", 0.34))
     )
+    SEMANTIC_TRIM_TAIL_MARGIN = float(
+        os.getenv("SEMANTIC_TRIM_TAIL_MARGIN", _SEMANTIC_SEARCH.get("trim_tail_margin", 0.0))
+    )
     SEMANTIC_TRIM_HEAD_NEG_THRESHOLD = float(
         os.getenv("SEMANTIC_TRIM_HEAD_NEG_THRESHOLD", _SEMANTIC_SEARCH.get("trim_head_neg_threshold", 0.55))
     )
     SEMANTIC_TRIM_HEAD_POS_THRESHOLD = float(
         os.getenv("SEMANTIC_TRIM_HEAD_POS_THRESHOLD", _SEMANTIC_SEARCH.get("trim_head_pos_threshold", 0.3))
     )
+    SEMANTIC_TRIM_HEAD_MARGIN = float(
+        os.getenv("SEMANTIC_TRIM_HEAD_MARGIN", _SEMANTIC_SEARCH.get("trim_head_margin", 0.0))
+    )
+    SEMANTIC_TRIM_NEG_WEIGHT_LINE = float(
+        os.getenv("SEMANTIC_TRIM_NEG_WEIGHT_LINE", _SEMANTIC_SEARCH.get("trim_neg_weight_line", 1.0))
+    )
+    SEMANTIC_TRIM_POS_WEIGHT_LINE = float(
+        os.getenv("SEMANTIC_TRIM_POS_WEIGHT_LINE", _SEMANTIC_SEARCH.get("trim_pos_weight_line", 1.0))
+    )
+    SEMANTIC_MAX_TAIL_TRIM = int(
+        os.getenv("SEMANTIC_MAX_TAIL_TRIM", _SEMANTIC_SEARCH.get("max_tail_trim", 20))
+    )
+    SEMANTIC_MAX_HEAD_TRIM = int(
+        os.getenv("SEMANTIC_MAX_HEAD_TRIM", _SEMANTIC_SEARCH.get("max_head_trim", 20))
+    )
     SEMANTIC_BOUNDARY_NEG_THRESHOLD = float(
         os.getenv("SEMANTIC_BOUNDARY_NEG_THRESHOLD", _SEMANTIC_SEARCH.get("boundary_neg_threshold", 0.5))
     )
     SEMANTIC_BOUNDARY_POS_THRESHOLD = float(
         os.getenv("SEMANTIC_BOUNDARY_POS_THRESHOLD", _SEMANTIC_SEARCH.get("boundary_pos_threshold", 0.32))
+    )
+    SEMANTIC_BOUNDARY_MARGIN = float(
+        os.getenv("SEMANTIC_BOUNDARY_MARGIN", _SEMANTIC_SEARCH.get("boundary_margin", 0.0))
     )
     SEMANTIC_BOUNDARY_TAIL_RUN = int(
         os.getenv("SEMANTIC_BOUNDARY_TAIL_RUN", _SEMANTIC_SEARCH.get("boundary_tail_run", 0))
@@ -264,10 +285,17 @@ class Config:
             "semantic_cluster_overlap_only": cls.SEMANTIC_CLUSTER_OVERLAP_ONLY,
             "semantic_trim_tail_neg_threshold": cls.SEMANTIC_TRIM_TAIL_NEG_THRESHOLD,
             "semantic_trim_tail_pos_threshold": cls.SEMANTIC_TRIM_TAIL_POS_THRESHOLD,
+            "semantic_trim_tail_margin": cls.SEMANTIC_TRIM_TAIL_MARGIN,
             "semantic_trim_head_neg_threshold": cls.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD,
             "semantic_trim_head_pos_threshold": cls.SEMANTIC_TRIM_HEAD_POS_THRESHOLD,
+            "semantic_trim_head_margin": cls.SEMANTIC_TRIM_HEAD_MARGIN,
+            "semantic_trim_neg_weight_line": cls.SEMANTIC_TRIM_NEG_WEIGHT_LINE,
+            "semantic_trim_pos_weight_line": cls.SEMANTIC_TRIM_POS_WEIGHT_LINE,
+            "semantic_max_tail_trim": cls.SEMANTIC_MAX_TAIL_TRIM,
+            "semantic_max_head_trim": cls.SEMANTIC_MAX_HEAD_TRIM,
             "semantic_boundary_neg_threshold": cls.SEMANTIC_BOUNDARY_NEG_THRESHOLD,
             "semantic_boundary_pos_threshold": cls.SEMANTIC_BOUNDARY_POS_THRESHOLD,
+            "semantic_boundary_margin": cls.SEMANTIC_BOUNDARY_MARGIN,
             "semantic_boundary_tail_run": cls.SEMANTIC_BOUNDARY_TAIL_RUN,
             "semantic_boundary_head_run": cls.SEMANTIC_BOUNDARY_HEAD_RUN,
             "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
