@@ -1,6 +1,7 @@
 # config.py
 import json
 import os
+import re
 from pathlib import Path
 
 try:
@@ -80,7 +81,15 @@ def _load_json_array(path: str) -> list:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         return data if isinstance(data, list) else []
     except Exception:
-        return []
+        # Fallback for template files that contain raw newlines in "text" values.
+        try:
+            raw = Path(path).read_text(encoding="utf-8")
+        except Exception:
+            return []
+        items = []
+        for idx, match in enumerate(re.finditer(r'"text"\s*:\s*"([\s\S]*?)"\s*(?:,|\})', raw), start=1):
+            items.append({"id": f"fallback_{idx}", "text": match.group(1)})
+        return items
 
 
 class Config:
