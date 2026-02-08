@@ -1,84 +1,99 @@
 # EREX
 
-Language: **中文** | [English](README.en.md) | [日本語](README.ja.md)
+[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-## About
-EREX 是一套以语义理解（Semantic Understanding）为核心的邮件数据抽取平台，利用 Transformer Embedding 技术实现对邮件内容的深度语义匹配、块级智能分割与意图识别。通过配置驱动的 NLP 管道，EREX 能够从 PST/MSG/EML 等海量邮件中自动识别领域语义、抽取关键要素，并转换为结构化数据，为企业信息处理提供智能化、自动化支撑。
+Semantic email extraction platform powered by configurable NLP pipelines and embedding-based understanding.
 
-### 核心能力
-- **语义筛选**：Sentence-Transformers 向量相似度 + 模板匹配，自动捕捉与招聘/业务相关的语义片段。
-- **轻量行过滤**：规则化去噪（签名、免责声明、装饰行等），降低 embedding 开销。
-- **块级分割**：按“案件/案件名”等标记拆分多块内容，支持多职位/多段识别。
-- **关键字抽取 & 分类**：配置化技术词典、正则分类器，生成统计与标签。
-- **聚合与洞察**：按邮件/全局汇总块数、关键字、分类分布；可调用 OpenAI 获取技术说明（tech insight）。
-- **前后端分离**：FastAPI 后端 + Vite/React 前端，提供上传、运行、可视化、关键词点击洞察等界面。
+## Features
 
-## 快速开始（Docker）
-### 1. 环境准备
-- 安装 Docker / Docker Compose
-- 在仓库根目录创建 `.env`（参考 `.env.example`），填写必要配置：
-  - `OPENAI_API_KEY`（可选，用于 tech-insight）
-  - 其他服务参数（端口、日志、数据库等）
+- Semantic filtering with Sentence-Transformers embeddings.
+- Lightweight line filtering to remove signatures/disclaimers/noise.
+- Block splitting for multi-position emails.
+- Configurable keyword extraction and rule-based classification.
+- Aggregated analytics and optional LLM-based tech insight.
+- Frontend + backend architecture (React/Vite + FastAPI).
 
-### 2. 构建并启动
+## Quick Start
+
+### Prerequisites
+
+- Docker / Docker Compose
+- `.env` file at repository root (based on `.env.example`)
+
+### Run with Docker
+
 ```bash
 cd infra
-# 前后端一并启动（前端 3000/8002，后端 8000 映射到本机）
 docker compose up --build
 ```
-> 若需要重新构建：`docker compose build`。
-> `infra/docker-compose.yml` 已为 backend 配置 `gpus: all`，在具备 NVIDIA Container Toolkit 的环境可直接使用 CUDA。
 
-### 2.1 语义计算设备切换（CPU / GPU）
-- 在 `.env` 中设置：
-  - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`
-  - `SEMANTIC_DEVICE=`（可选，强制指定如 `cuda:0`）
-- 推荐 GPU 环境使用：`SEMANTIC_ACCELERATOR=gpu`
-- 验证容器 GPU：`cd infra && docker compose exec backend nvidia-smi`
+### Access
 
-### 3. 访问
-- 前端：`http://localhost:8002`（或配置的域名/端口），提供上传、运行、配置查看、可视化等功能。
-- 后端 API：`http://localhost:8000`，可通过 `/docs` 查看 OpenAPI。
+- Frontend: `http://localhost:8002`
+- Backend: `http://localhost:8000`
+- OpenAPI: `http://localhost:8000/docs`
 
-## 主要接口
-- `GET /pipeline/config`：查看当前 pipeline 配置与步骤。
-- `POST /pipeline/upload` / `DELETE /pipeline/files` / `GET /pipeline/files`：文件管理（pst/eml/msg）。
-- `POST /pipeline/run`：运行完整 pipeline（cleaner → line_filter → semantic → splitter → extractor → classifier → aggregator）。
-- `POST /pipeline/run/start` + `GET /pipeline/run/{job_id}/progress` + `GET /pipeline/run/{job_id}/result`：异步运行与进度查询。
-- `POST /pipeline/history` / `GET /pipeline/history` / `GET /pipeline/history/{id}` / `DELETE /pipeline/history/{id}`：手动保存与管理历史结果（默认不自动保存）。
-- `POST /pipeline/tech-insight`：基于关键字统计调用 OpenAI（如未配置 key 则返回占位说明）。
+## GPU / CPU Mode
 
-## 开发说明
-- 后端：`backend`，FastAPI + uv；`uv run uvicorn app.main:app --reload` 本地开发。
-- 前端：`frontend`，Vite + React；`npm install && npm run dev` 本地开发。Docker 镜像内 Nginx 反代 `/pipeline/*` 到后端。
+Configure in `.env`:
 
-## 配置存储切换（DB / 文件）
-EREX 的 pipeline 配置默认从文件加载；当数据库可用时，前端保存会写入数据库，并在响应里返回 `source=db`。
+- `SEMANTIC_ACCELERATOR=cpu|gpu|auto`
+- `SEMANTIC_DEVICE=` (optional, e.g. `cuda:0`)
 
-生效方式：
-- `.env` 变更后需要重启后端进程（本地 `uvicorn` 或 `docker compose up -d --build`）。
-- 本地开发请把 `.env` 放在 `backend/.env`（`load_dotenv()` 从进程当前目录加载），或手动导出环境变量。
-- Docker Compose 方式请确保 `db` 服务已启动；容器内 `DB_HOST=db` 才能解析。
+Check GPU in container:
 
-常用环境变量：
 ```bash
-DB_HOST=localhost   # 本地运行后端时通常是 localhost；容器内用 db
-DB_PORT=5432
-DB_USER=erex_user
-DB_PASS=your_password
-DB_NAME=erex
+cd infra
+docker compose exec backend nvidia-smi
 ```
 
-排查方法：
-- 运行 `Config.summary()` 检查当前 DB 连接串是否符合预期。
-- 看到前端提示 “file fallback” 说明后端写 DB 失败，优先检查 `DB_HOST` 可解析与 DB 服务是否可达。
+## Core API
 
-## 目录结构（关键部分）
-- `backend/app/services/`：cleaner、line_filter、semantic、splitter、extractor、classifier、aggregator、pipeline 等核心模块。
-- `backend/config/`：语义模板、行过滤规则、关键字词典、分类器规则。
-- `frontend/`：Vite/React 前端代码与 Nginx 配置。
-- `infra/`：Docker Compose 配置。
+- `GET /pipeline/config`
+- `POST /pipeline/upload`
+- `GET /pipeline/files`
+- `DELETE /pipeline/files`
+- `POST /pipeline/run`
+- `POST /pipeline/run/start`
+- `GET /pipeline/run/{job_id}/progress`
+- `GET /pipeline/run/{job_id}/result`
+- `POST /pipeline/history`
+- `GET /pipeline/history`
+- `GET /pipeline/history/{id}`
+- `DELETE /pipeline/history/{id}`
+- `POST /pipeline/tech-insight`
 
-## 提示
-- 默认 pipeline 步骤可通过 `PIPELINE_STEPS` 控制。
-- 大文件上传已在前端 Nginx 放宽 `client_max_body_size`，长任务超时（反代）默认 30 分钟，可按需调整。
+## Development
+
+### Backend
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Configuration Source
+
+Pipeline configuration is loaded from file by default.
+If database storage is available, runtime source becomes `db`; otherwise fallback remains `file`.
+
+## Project Structure
+
+- `backend/app/services/` core pipeline modules
+- `backend/config/` semantic templates, dictionaries, rules
+- `frontend/` web UI
+- `infra/` Docker assets
+- `docs/` architecture and module documentation
+
+## License
+
+See `LICENSE.md`.
