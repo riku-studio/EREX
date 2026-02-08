@@ -537,21 +537,33 @@ def tech_insight(payload: TechInsightRequest):
         except Exception:
             return str(content) if content else ""
 
+    insight = ""
+    last_error = None
     try:
         response = client.responses.create(
             model=Config.OPENAI_MODEL,
             input=prompt
         )
         insight = _extract_text(response.output_text) or ""
-    except Exception as exc:  # pragma: no cover - network/dep issues
-        logger.error("OpenAI request failed: %s", exc)
-        fallback = (
-            f"{payload.keyword}: tech insight unavailable (OpenAI request failed). "
-            f"Count={payload.count}, ratio={payload.ratio:.2%}"
-        )
-        if payload.category:
-            fallback += f", category={payload.category}"
-        return TechInsightResponse(keyword=payload.keyword, insight=fallback)
+    except Exception as exc:  # pragma: no cover - provider compatibility/network
+        last_error = exc
+        logger.warning("OpenAI responses API failed, fallback to chat.completions: %s", exc)
+        try:
+            chat = client.chat.completions.create(
+                model=Config.OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            insight = (chat.choices[0].message.content or "").strip()
+        except Exception as exc2:  # pragma: no cover - network/dep issues
+            last_error = exc2
+            logger.error("OpenAI request failed: %s", exc2)
+            fallback = (
+                f"{payload.keyword}: tech insight unavailable (OpenAI request failed). "
+                f"Count={payload.count}, ratio={payload.ratio:.2%}"
+            )
+            if payload.category:
+                fallback += f", category={payload.category}"
+            return TechInsightResponse(keyword=payload.keyword, insight=fallback)
 
     if not insight.strip():
         insight = (
@@ -559,5 +571,7 @@ def tech_insight(payload: TechInsightRequest):
             f"Count={payload.count}, ratio={payload.ratio:.2%}"
             + (f", category={payload.category}" if payload.category else "")
         )
+        if last_error is not None:
+            logger.warning("OpenAI returned empty insight after fallback, last_error=%s", last_error)
 
     return TechInsightResponse(keyword=payload.keyword, insight=insight)

@@ -7,12 +7,14 @@ services:
     gpus: all
     env_file:
       - ../.env
+      - /srv/secrets/litellm.env
     environment:
       - TZ=Asia/Tokyo
       - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
     networks:
       - shared_network
+      - ollama_default
 
   frontend:
     build:
@@ -45,4 +47,6 @@ services:
 #   pgdata:
 networks:
   shared_network:
+    external: true
+  ollama_default:
     external: true

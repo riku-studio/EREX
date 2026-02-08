@@ -157,6 +157,15 @@ def _resolve_api_key(raw_value: str, path_value: str = "") -> tuple[str, str]:
     return value, "direct"
 
 
+def _normalize_base_url(raw_value: str) -> str:
+    value = (raw_value or "").strip()
+    if not value:
+        return ""
+    if "://" not in value:
+        value = f"http://{value}"
+    return value.rstrip("/")
+
+
 class Config:
     """Global configuration manager"""
 
@@ -189,7 +198,7 @@ class Config:
         os.getenv("OPENAI_API_KEY", ""),
         OPENAI_API_KEY_PATH,
     )
-    OPENAI_API_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "").strip()
+    OPENAI_API_BASE_URL = _normalize_base_url(os.getenv("OPENAI_API_BASE_URL", ""))
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     # Semantic (template-based) extraction
