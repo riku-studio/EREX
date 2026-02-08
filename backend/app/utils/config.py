@@ -148,6 +148,8 @@ class Config:
     SEMANTIC_POS_TOP_K = int(os.getenv("SEMANTIC_POS_TOP_K", _SEMANTIC_SEARCH.get("pos_top_k", 3)))
     SEMANTIC_NEGATIVE_WEIGHT = float(os.getenv("SEMANTIC_NEGATIVE_WEIGHT", _SEMANTIC_SEARCH.get("negative_weight", 0.35)))
     SEMANTIC_LENGTH_PENALTY = float(os.getenv("SEMANTIC_LENGTH_PENALTY", _SEMANTIC_SEARCH.get("length_penalty", 0.02)))
+    SEMANTIC_LENGTH_REWARD = float(os.getenv("SEMANTIC_LENGTH_REWARD", _SEMANTIC_SEARCH.get("length_reward", 0.0)))
+    SEMANTIC_CENTER_WEIGHT = float(os.getenv("SEMANTIC_CENTER_WEIGHT", _SEMANTIC_SEARCH.get("center_weight", 0.0)))
     SEMANTIC_WINDOW_MAX_LINES = int(os.getenv("SEMANTIC_WINDOW_MAX_LINES", _SEMANTIC_SEARCH.get("window_max_lines", 24)))
     SEMANTIC_MIN_LINES = int(os.getenv("SEMANTIC_MIN_LINES", _SEMANTIC_SEARCH.get("min_lines", 2)))
 
@@ -221,6 +223,8 @@ class Config:
             "semantic_negative_weight": cls.SEMANTIC_NEGATIVE_WEIGHT,
             "semantic_pos_top_k": cls.SEMANTIC_POS_TOP_K,
             "semantic_length_penalty": cls.SEMANTIC_LENGTH_PENALTY,
+            "semantic_length_reward": cls.SEMANTIC_LENGTH_REWARD,
+            "semantic_center_weight": cls.SEMANTIC_CENTER_WEIGHT,
             "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
             "semantic_min_lines": cls.SEMANTIC_MIN_LINES,
             "keywords_tech_path": cls.KEYWORDS_TECH_PATH,

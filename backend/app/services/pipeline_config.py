@@ -221,6 +221,8 @@ class PipelineConfigService:
         cfg.SEMANTIC_POS_TOP_K = int(search.get("pos_top_k", cfg.SEMANTIC_POS_TOP_K))
         cfg.SEMANTIC_NEGATIVE_WEIGHT = float(search.get("negative_weight", cfg.SEMANTIC_NEGATIVE_WEIGHT))
         cfg.SEMANTIC_LENGTH_PENALTY = float(search.get("length_penalty", cfg.SEMANTIC_LENGTH_PENALTY))
+        cfg.SEMANTIC_LENGTH_REWARD = float(search.get("length_reward", cfg.SEMANTIC_LENGTH_REWARD))
+        cfg.SEMANTIC_CENTER_WEIGHT = float(search.get("center_weight", cfg.SEMANTIC_CENTER_WEIGHT))
         cfg.SEMANTIC_WINDOW_MAX_LINES = int(search.get("window_max_lines", cfg.SEMANTIC_WINDOW_MAX_LINES))
         cfg.SEMANTIC_MIN_LINES = int(search.get("min_lines", cfg.SEMANTIC_MIN_LINES))
 

@@ -83,6 +83,8 @@ class SemanticExtractor:
         self.negative_weight = Config.SEMANTIC_NEGATIVE_WEIGHT
         self.pos_top_k = max(1, Config.SEMANTIC_POS_TOP_K)
         self.length_penalty = Config.SEMANTIC_LENGTH_PENALTY
+        self.length_reward = Config.SEMANTIC_LENGTH_REWARD
+        self.center_weight = Config.SEMANTIC_CENTER_WEIGHT
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
         self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
 
@@ -142,11 +144,27 @@ class SemanticExtractor:
             window_vec = window_vec / norm
         return window_vec
 
-    def _window_score(self, window_embedding: np.ndarray, window_len: int) -> float:
+    def _center_score(self, start: int, end: int, total_lines: int) -> float:
+        if total_lines <= 1:
+            return 1.0
+        doc_mid = (total_lines - 1) / 2.0
+        denom = max(doc_mid, 1.0)
+        window_mid = (start + end) / 2.0
+        return max(0.0, 1.0 - (abs(window_mid - doc_mid) / denom))
+
+    def _window_score(self, window_embedding: np.ndarray, window_len: int, start: int, end: int, total_lines: int) -> float:
         # Fixed to tuned best rule: mean_pos_max_neg.
         pos = self._mean_topk_sim(window_embedding, self.global_embeddings, self.pos_top_k)
         neg = self._max_sim(window_embedding, self.negative_embeddings)
-        return pos - (self.negative_weight * neg) - (self.length_penalty * float(np.log1p(window_len)))
+        center_bonus = self.center_weight * self._center_score(start, end, total_lines)
+        length_term = float(np.log1p(window_len))
+        return (
+            pos
+            - (self.negative_weight * neg)
+            - (self.length_penalty * length_term)
+            + (self.length_reward * length_term)
+            + center_bonus
+        )
 
     def _search_best_window(self, line_embeddings: np.ndarray) -> Tuple[Optional[Tuple[int, int]], float]:
         total_lines = line_embeddings.shape[0]
@@ -167,7 +185,7 @@ class SemanticExtractor:
             for start in range(0, total_lines - length + 1):
                 end = start + length - 1
                 window_vec = self._window_embedding(prefix, start, end)
-                score = self._window_score(window_vec, length)
+                score = self._window_score(window_vec, length, start, end, total_lines)
                 if score > best_score or (abs(score - best_score) <= 1e-9 and length < best_len):
                     best_score = score
                     best_len = length

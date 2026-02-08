@@ -18,6 +18,8 @@
     - `pos_top_k`（正向模板取 top-k 相似度均值）
     - `negative_weight`
     - `length_penalty`
+    - `length_reward`
+    - `center_weight`
     - `window_max_lines`
     - `min_lines`
   - `fields`: `{ [field: string]: string[] }`，字段级模板列表（如 overview / work_content / skill / working_conditions / contract / restriction）。
@@ -26,8 +28,9 @@
 1. cleaner 后的正文通过 `LineFilter` 做轻量负向过滤（去问候、签名、免责声明等）。
 2. 将过滤结果按行切分，移除空行。
 3. 对每一行做 embedding，并使用前缀和快速构造任意连续窗口向量。
-4. 对所有连续窗口（长度范围 `min_lines..window_max_lines`）计算分数：`window_score = mean(top-k sim(global)) - negative_weight * max(sim(negative)) - length_penalty * log(1+lines)`。
-5. 选择分数最高窗口，若分数 >= `global_threshold`，输出 `SemanticResult`：
+4. 对所有连续窗口（长度范围 `min_lines..window_max_lines`）计算分数：  
+   `window_score = mean(top-k sim(global)) - negative_weight * max(sim(negative)) - length_penalty * log(1+lines) + length_reward * log(1+lines) + center_weight * center_score`
+5. `center_score` 基于窗口中心与正文中心的距离，越靠近正文中部得分越高（0~1）。
 6. 选择分数最高窗口，若分数 >= `global_threshold`，输出 `SemanticResult`：
    - `text`: 覆盖行拼接后的正文
    - `score`: 最优窗口分数
@@ -41,12 +44,23 @@
   - 正向分数：`mean(top-3 sim(global_templates))`
   - 负向分数：`max(sim(negative_templates))`
 - 默认超参（已写回配置）：
-  - `global_threshold=0.2`
+  - `global_threshold=0.15`
   - `search.pos_top_k=3`
-  - `search.negative_weight=0.2`
+  - `search.negative_weight=0.15`
   - `search.length_penalty=0.0`
-  - `search.min_lines=3`
-  - `search.window_max_lines=20`
+  - `search.length_reward=0.03`
+  - `search.center_weight=0.1`
+  - `search.min_lines=2`
+  - `search.window_max_lines=28`
+
+## 本轮验证结果（`tests/out_recruitment_extract.csv`）
+- 评估口径：`block_text` 上预测窗口 vs `recruitment_text` 金标窗口（行级）。
+- 指标：
+  - `line_precision=0.9023`
+  - `line_recall=0.6118`
+  - `line_f1=0.7292`
+  - `exact_rate=0.0455`
+  - `mean_iou=0.5601`
 
 ## 如何获取最优规则/超参
 1. 构造 gold 标注：
@@ -58,8 +72,8 @@
    - 全量对比：`tests/semantic_window_tuning_results.csv`
    - 最佳配置：`tests/semantic_window_tuning_best.json`
 4. 选型策略：
-   - 先按 `line_f1` 排序，再看 `exact_rate` 和 `mean_iou`。
-   - 在业务对召回更敏感时，可降低阈值；对精度更敏感时，提高 `negative_weight` 或增加 `min_lines`。
+  - 本轮以 `mean_iou` 为主目标，`exact_rate` 为次目标，兼顾 `line_f1`。
+  - 在业务对召回更敏感时，可降低阈值；对精度更敏感时，提高 `negative_weight` 或降低 `length_reward`。
 
 ## 日志
 - info 级：body 总数、`global_threshold`、top window 分数示例。
