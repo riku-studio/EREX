@@ -1,5 +1,7 @@
 # EREX
 
+Language: **中文** | [English](README.en.md) | [日本語](README.ja.md)
+
 ## About
 EREX 是一套以语义理解（Semantic Understanding）为核心的邮件数据抽取平台，利用 Transformer Embedding 技术实现对邮件内容的深度语义匹配、块级智能分割与意图识别。通过配置驱动的 NLP 管道，EREX 能够从 PST/MSG/EML 等海量邮件中自动识别领域语义、抽取关键要素，并转换为结构化数据，为企业信息处理提供智能化、自动化支撑。
 
