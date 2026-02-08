@@ -11,4 +11,7 @@ from app.utils.config import Config
 def get_openai_client():
     if OpenAI is None or not Config.OPENAI_API_KEY:
         return None
-    return OpenAI(api_key=Config.OPENAI_API_KEY)
+    kwargs = {"api_key": Config.OPENAI_API_KEY}
+    if Config.OPENAI_API_BASE_URL:
+        kwargs["base_url"] = Config.OPENAI_API_BASE_URL
+    return OpenAI(**kwargs)

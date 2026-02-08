@@ -92,6 +92,70 @@ def _load_json_array(path: str) -> list:
         return items
 
 
+def _read_secret_file(path: Path) -> str:
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+    if not raw:
+        return ""
+
+    # Support .env-like files:
+    # - OPENAI_API_KEY=...
+    # - LITELLM_API_KEY=...
+    # - API_KEY=...
+    # Also fallback to first non-empty, non-comment line.
+    candidates = {
+        "OPENAI_API_KEY": "",
+        "LITELLM_API_KEY": "",
+        "API_KEY": "",
+    }
+    first_raw_value = ""
+
+    for line in raw.splitlines():
+        text = line.strip()
+        if not text or text.startswith("#"):
+            continue
+        if not first_raw_value:
+            first_raw_value = text
+        if "=" in text:
+            key, value = text.split("=", 1)
+            k = key.strip().removeprefix("export").strip().upper()
+            v = value.strip().strip("'").strip('"')
+            if k in candidates and v:
+                candidates[k] = v
+        elif text.startswith("sk-"):
+            return text
+
+    for key in ("OPENAI_API_KEY", "LITELLM_API_KEY", "API_KEY"):
+        if candidates[key]:
+            return candidates[key]
+
+    if "=" in first_raw_value:
+        _, value = first_raw_value.split("=", 1)
+        return value.strip().strip("'").strip('"')
+    return first_raw_value
+
+
+def _resolve_api_key(raw_value: str, path_value: str = "") -> tuple[str, str]:
+    # Priority: explicit OPENAI_API_KEY_PATH > OPENAI_API_KEY-as-path > direct value.
+    explicit_path = (path_value or "").strip()
+    if explicit_path:
+        secret = _read_secret_file(Path(explicit_path))
+        return secret, ("file" if secret else "missing_file")
+
+    value = (raw_value or "").strip()
+    if not value:
+        return "", "empty"
+
+    candidate = Path(value)
+    if candidate.is_absolute() or value.startswith("./") or value.startswith("../"):
+        if candidate.exists() and candidate.is_file():
+            secret = _read_secret_file(candidate)
+            return secret, ("file" if secret else "missing_file")
+    return value, "direct"
+
+
 class Config:
     """Global configuration manager"""
 
@@ -119,7 +183,12 @@ class Config:
     LOG_TO_FILE = os.getenv("LOG_TO_FILE", "false").lower() == "true"
 
     # OpenAI
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY_PATH = os.getenv("OPENAI_API_KEY_PATH", "").strip()
+    OPENAI_API_KEY, OPENAI_API_KEY_SOURCE = _resolve_api_key(
+        os.getenv("OPENAI_API_KEY", ""),
+        OPENAI_API_KEY_PATH,
+    )
+    OPENAI_API_BASE_URL = os.getenv("OPENAI_API_BASE_URL", "").strip()
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     # Semantic (template-based) extraction
@@ -263,6 +332,8 @@ class Config:
             "log_format": cls.LOG_FORMAT,
             "log_to_file": cls.LOG_TO_FILE,
             "openai_model": cls.OPENAI_MODEL,
+            "openai_api_base_url": cls.OPENAI_API_BASE_URL or "default",
+            "openai_api_key_source": cls.OPENAI_API_KEY_SOURCE,
             "semantic_model": cls.SEMANTIC_MODEL,
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
             "semantic_accelerator": cls.SEMANTIC_ACCELERATOR,
