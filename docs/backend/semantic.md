@@ -20,6 +20,13 @@
     - `length_penalty`
     - `length_reward`
     - `center_weight`
+    - `cluster_delta`
+    - `cluster_min_windows`
+    - `cluster_overlap_only`
+    - `trim_tail_neg_threshold`
+    - `trim_tail_pos_threshold`
+    - `trim_head_neg_threshold`
+    - `trim_head_pos_threshold`
     - `window_max_lines`
     - `min_lines`
   - `fields`: `{ [field: string]: string[] }`，字段级模板列表（如 overview / work_content / skill / working_conditions / contract / restriction）。
@@ -31,7 +38,12 @@
 4. 对所有连续窗口（长度范围 `min_lines..window_max_lines`）计算分数：  
    `window_score = mean(top-k sim(global)) - negative_weight * max(sim(negative)) - length_penalty * log(1+lines) + length_reward * log(1+lines) + center_weight * center_score`
 5. `center_score` 基于窗口中心与正文中心的距离，越靠近正文中部得分越高（0~1）。
-6. 选择分数最高窗口，若分数 >= `global_threshold`，输出 `SemanticResult`：
+6. 以最高分窗口为核心，收集 `score >= max(global_threshold, best_score - cluster_delta)` 的候选窗口；若候选数达到 `cluster_min_windows`，并在 `cluster_overlap_only=true` 下与核心窗口重叠，则合并成更完整边界。
+7. 对合并后的边界做头尾裁剪：
+   - 尾部：公司/签名/免责声明类负向行优先剔除；
+   - 头部：问候类行轻度剔除；
+   - 并结合行级正负分阈值（`trim_*`）抑制无关行。
+8. 最终分数仍使用核心窗口最高分，输出 `SemanticResult`：
    - `text`: 覆盖行拼接后的正文
    - `score`: 最优窗口分数
    - `start_line` / `end_line`: 覆盖行区间（基于过滤后的行索引）
@@ -51,16 +63,23 @@
   - `search.length_reward=0.03`
   - `search.center_weight=0.1`
   - `search.min_lines=2`
-  - `search.window_max_lines=28`
+  - `search.window_max_lines=44`
+  - `search.cluster_delta=0.15`
+  - `search.cluster_min_windows=6`
+  - `search.cluster_overlap_only=true`
+  - `search.trim_tail_neg_threshold=0.4`
+  - `search.trim_tail_pos_threshold=0.34`
+  - `search.trim_head_neg_threshold=0.55`
+  - `search.trim_head_pos_threshold=0.3`
 
 ## 本轮验证结果（`tests/out_recruitment_extract.csv`）
 - 评估口径：`block_text` 上预测窗口 vs `recruitment_text` 金标窗口（行级）。
 - 指标：
-  - `line_precision=0.9023`
-  - `line_recall=0.6118`
-  - `line_f1=0.7292`
-  - `exact_rate=0.0455`
-  - `mean_iou=0.5601`
+  - `line_precision=0.7630`
+  - `line_recall=0.9740`
+  - `line_f1=0.8557`
+  - `exact_rate=0.1364`
+  - `mean_iou=0.7444`
 
 ## 如何获取最优规则/超参
 1. 构造 gold 标注：

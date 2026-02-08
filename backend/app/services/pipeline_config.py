@@ -223,6 +223,23 @@ class PipelineConfigService:
         cfg.SEMANTIC_LENGTH_PENALTY = float(search.get("length_penalty", cfg.SEMANTIC_LENGTH_PENALTY))
         cfg.SEMANTIC_LENGTH_REWARD = float(search.get("length_reward", cfg.SEMANTIC_LENGTH_REWARD))
         cfg.SEMANTIC_CENTER_WEIGHT = float(search.get("center_weight", cfg.SEMANTIC_CENTER_WEIGHT))
+        cfg.SEMANTIC_CLUSTER_DELTA = float(search.get("cluster_delta", cfg.SEMANTIC_CLUSTER_DELTA))
+        cfg.SEMANTIC_CLUSTER_MIN_WINDOWS = int(search.get("cluster_min_windows", cfg.SEMANTIC_CLUSTER_MIN_WINDOWS))
+        cfg.SEMANTIC_CLUSTER_OVERLAP_ONLY = bool(
+            search.get("cluster_overlap_only", cfg.SEMANTIC_CLUSTER_OVERLAP_ONLY)
+        )
+        cfg.SEMANTIC_TRIM_TAIL_NEG_THRESHOLD = float(
+            search.get("trim_tail_neg_threshold", cfg.SEMANTIC_TRIM_TAIL_NEG_THRESHOLD)
+        )
+        cfg.SEMANTIC_TRIM_TAIL_POS_THRESHOLD = float(
+            search.get("trim_tail_pos_threshold", cfg.SEMANTIC_TRIM_TAIL_POS_THRESHOLD)
+        )
+        cfg.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD = float(
+            search.get("trim_head_neg_threshold", cfg.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD)
+        )
+        cfg.SEMANTIC_TRIM_HEAD_POS_THRESHOLD = float(
+            search.get("trim_head_pos_threshold", cfg.SEMANTIC_TRIM_HEAD_POS_THRESHOLD)
+        )
         cfg.SEMANTIC_WINDOW_MAX_LINES = int(search.get("window_max_lines", cfg.SEMANTIC_WINDOW_MAX_LINES))
         cfg.SEMANTIC_MIN_LINES = int(search.get("min_lines", cfg.SEMANTIC_MIN_LINES))
 

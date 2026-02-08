@@ -150,6 +150,26 @@ class Config:
     SEMANTIC_LENGTH_PENALTY = float(os.getenv("SEMANTIC_LENGTH_PENALTY", _SEMANTIC_SEARCH.get("length_penalty", 0.02)))
     SEMANTIC_LENGTH_REWARD = float(os.getenv("SEMANTIC_LENGTH_REWARD", _SEMANTIC_SEARCH.get("length_reward", 0.0)))
     SEMANTIC_CENTER_WEIGHT = float(os.getenv("SEMANTIC_CENTER_WEIGHT", _SEMANTIC_SEARCH.get("center_weight", 0.0)))
+    SEMANTIC_CLUSTER_DELTA = float(os.getenv("SEMANTIC_CLUSTER_DELTA", _SEMANTIC_SEARCH.get("cluster_delta", 0.0)))
+    SEMANTIC_CLUSTER_MIN_WINDOWS = int(
+        os.getenv("SEMANTIC_CLUSTER_MIN_WINDOWS", _SEMANTIC_SEARCH.get("cluster_min_windows", 1))
+    )
+    SEMANTIC_CLUSTER_OVERLAP_ONLY = os.getenv(
+        "SEMANTIC_CLUSTER_OVERLAP_ONLY",
+        str(_SEMANTIC_SEARCH.get("cluster_overlap_only", True)).lower(),
+    ).lower() == "true"
+    SEMANTIC_TRIM_TAIL_NEG_THRESHOLD = float(
+        os.getenv("SEMANTIC_TRIM_TAIL_NEG_THRESHOLD", _SEMANTIC_SEARCH.get("trim_tail_neg_threshold", 0.4))
+    )
+    SEMANTIC_TRIM_TAIL_POS_THRESHOLD = float(
+        os.getenv("SEMANTIC_TRIM_TAIL_POS_THRESHOLD", _SEMANTIC_SEARCH.get("trim_tail_pos_threshold", 0.34))
+    )
+    SEMANTIC_TRIM_HEAD_NEG_THRESHOLD = float(
+        os.getenv("SEMANTIC_TRIM_HEAD_NEG_THRESHOLD", _SEMANTIC_SEARCH.get("trim_head_neg_threshold", 0.55))
+    )
+    SEMANTIC_TRIM_HEAD_POS_THRESHOLD = float(
+        os.getenv("SEMANTIC_TRIM_HEAD_POS_THRESHOLD", _SEMANTIC_SEARCH.get("trim_head_pos_threshold", 0.3))
+    )
     SEMANTIC_WINDOW_MAX_LINES = int(os.getenv("SEMANTIC_WINDOW_MAX_LINES", _SEMANTIC_SEARCH.get("window_max_lines", 24)))
     SEMANTIC_MIN_LINES = int(os.getenv("SEMANTIC_MIN_LINES", _SEMANTIC_SEARCH.get("min_lines", 2)))
 
@@ -225,6 +245,13 @@ class Config:
             "semantic_length_penalty": cls.SEMANTIC_LENGTH_PENALTY,
             "semantic_length_reward": cls.SEMANTIC_LENGTH_REWARD,
             "semantic_center_weight": cls.SEMANTIC_CENTER_WEIGHT,
+            "semantic_cluster_delta": cls.SEMANTIC_CLUSTER_DELTA,
+            "semantic_cluster_min_windows": cls.SEMANTIC_CLUSTER_MIN_WINDOWS,
+            "semantic_cluster_overlap_only": cls.SEMANTIC_CLUSTER_OVERLAP_ONLY,
+            "semantic_trim_tail_neg_threshold": cls.SEMANTIC_TRIM_TAIL_NEG_THRESHOLD,
+            "semantic_trim_tail_pos_threshold": cls.SEMANTIC_TRIM_TAIL_POS_THRESHOLD,
+            "semantic_trim_head_neg_threshold": cls.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD,
+            "semantic_trim_head_pos_threshold": cls.SEMANTIC_TRIM_HEAD_POS_THRESHOLD,
             "semantic_window_max_lines": cls.SEMANTIC_WINDOW_MAX_LINES,
             "semantic_min_lines": cls.SEMANTIC_MIN_LINES,
             "keywords_tech_path": cls.KEYWORDS_TECH_PATH,

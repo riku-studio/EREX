@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Dict, List, Optional, Protocol, Sequence, Tuple
@@ -56,6 +57,16 @@ def prepare_semantic_input(body: str, line_filter: LineFilter | None = None) -> 
 
 
 class SemanticExtractor:
+    _TAIL_NEG_RE = re.compile(
+        r"(株式会社|有限会社|会社概要|担当|連絡先|電話|TEL|Mail|E-mail|URL|https?://|www\.|"
+        r"商流|無断転送|掲載はお控え|ご紹介の際は|よろしくお願いいたします|ご確認ください)",
+        re.IGNORECASE,
+    )
+    _HEAD_KEEP_RE = re.compile(
+        r"(案件名|案件概要|概要|募集|業務内容|ポジション|プロジェクト|担当工程|必須スキル|勤務地|作業場所)"
+    )
+    _HEAD_GREET_RE = re.compile(r"^(お世話になっております|いつもお世話になっております|ご担当者様|各位)")
+
     def __init__(
         self,
         model: EmbeddingModel,
@@ -85,6 +96,13 @@ class SemanticExtractor:
         self.length_penalty = Config.SEMANTIC_LENGTH_PENALTY
         self.length_reward = Config.SEMANTIC_LENGTH_REWARD
         self.center_weight = Config.SEMANTIC_CENTER_WEIGHT
+        self.cluster_delta = max(0.0, Config.SEMANTIC_CLUSTER_DELTA)
+        self.cluster_min_windows = max(1, Config.SEMANTIC_CLUSTER_MIN_WINDOWS)
+        self.cluster_overlap_only = Config.SEMANTIC_CLUSTER_OVERLAP_ONLY
+        self.trim_tail_neg_threshold = Config.SEMANTIC_TRIM_TAIL_NEG_THRESHOLD
+        self.trim_tail_pos_threshold = Config.SEMANTIC_TRIM_TAIL_POS_THRESHOLD
+        self.trim_head_neg_threshold = Config.SEMANTIC_TRIM_HEAD_NEG_THRESHOLD
+        self.trim_head_pos_threshold = Config.SEMANTIC_TRIM_HEAD_POS_THRESHOLD
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
         self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
 
@@ -153,7 +171,7 @@ class SemanticExtractor:
         return max(0.0, 1.0 - (abs(window_mid - doc_mid) / denom))
 
     def _window_score(self, window_embedding: np.ndarray, window_len: int, start: int, end: int, total_lines: int) -> float:
-        # Fixed to tuned best rule: mean_pos_max_neg.
+        # Tuned base rule: mean_pos_max_neg + length/center terms.
         pos = self._mean_topk_sim(window_embedding, self.global_embeddings, self.pos_top_k)
         neg = self._max_sim(window_embedding, self.negative_embeddings)
         center_bonus = self.center_weight * self._center_score(start, end, total_lines)
@@ -165,6 +183,72 @@ class SemanticExtractor:
             + (self.length_reward * length_term)
             + center_bonus
         )
+
+    def _window_line_scores(self, line_embeddings: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        if line_embeddings.size == 0:
+            return np.asarray([], dtype=float), np.asarray([], dtype=float)
+        pos_sims = line_embeddings @ self.global_embeddings.T if self.global_embeddings.size else np.zeros((line_embeddings.shape[0], 1))
+        neg_sims = line_embeddings @ self.negative_embeddings.T if self.negative_embeddings.size else np.zeros((line_embeddings.shape[0], 1))
+        pos_scores: List[float] = []
+        for sims in pos_sims:
+            flat = np.ravel(sims)
+            if flat.size == 0:
+                pos_scores.append(0.0)
+                continue
+            k = min(max(1, self.pos_top_k), flat.shape[0])
+            top = np.partition(flat, flat.shape[0] - k)[-k:]
+            pos_scores.append(float(np.mean(top)))
+        neg_scores = np.max(neg_sims, axis=1) if neg_sims.size else np.zeros((line_embeddings.shape[0],), dtype=float)
+        return np.asarray(pos_scores, dtype=float), np.asarray(neg_scores, dtype=float)
+
+    def _trim_window(
+        self,
+        lines: Sequence[str],
+        line_pos_scores: np.ndarray,
+        line_neg_scores: np.ndarray,
+        start_line: int,
+        end_line: int,
+    ) -> Tuple[Optional[int], Optional[int]]:
+        s = start_line
+        e = end_line
+
+        while e >= s:
+            text = lines[e]
+            if self._HEAD_KEEP_RE.search(text):
+                break
+            if self._TAIL_NEG_RE.search(text):
+                e -= 1
+                continue
+            if (
+                e < line_neg_scores.shape[0]
+                and line_neg_scores[e] >= self.trim_tail_neg_threshold
+                and e < line_pos_scores.shape[0]
+                and line_pos_scores[e] <= self.trim_tail_pos_threshold
+            ):
+                e -= 1
+                continue
+            break
+
+        while s <= e:
+            text = lines[s]
+            if self._HEAD_KEEP_RE.search(text):
+                break
+            if self._HEAD_GREET_RE.search(text):
+                s += 1
+                continue
+            if (
+                s < line_neg_scores.shape[0]
+                and line_neg_scores[s] >= self.trim_head_neg_threshold
+                and s < line_pos_scores.shape[0]
+                and line_pos_scores[s] <= self.trim_head_pos_threshold
+            ):
+                s += 1
+                continue
+            break
+
+        if e < s:
+            return None, None
+        return s, e
 
     def _search_best_window(self, line_embeddings: np.ndarray) -> Tuple[Optional[Tuple[int, int]], float]:
         total_lines = line_embeddings.shape[0]
@@ -178,6 +262,9 @@ class SemanticExtractor:
         max_lines = min(self.window_max_lines, total_lines)
         min_lines = self.min_lines
         prefix = np.vstack([np.zeros((1, line_embeddings.shape[1]), dtype=float), np.cumsum(line_embeddings, axis=0)])
+        starts: List[int] = []
+        ends: List[int] = []
+        scores: List[float] = []
         best_window: Optional[Tuple[int, int]] = None
         best_score = -1e9
         best_len = 10**9
@@ -186,10 +273,49 @@ class SemanticExtractor:
                 end = start + length - 1
                 window_vec = self._window_embedding(prefix, start, end)
                 score = self._window_score(window_vec, length, start, end, total_lines)
+                starts.append(start)
+                ends.append(end)
+                scores.append(score)
                 if score > best_score or (abs(score - best_score) <= 1e-9 and length < best_len):
                     best_score = score
                     best_len = length
                     best_window = (start, end)
+
+        if best_window is None:
+            return None, 0.0
+        if not scores:
+            return best_window, float(best_score if best_score > -1e8 else 0.0)
+
+        window_starts = np.asarray(starts, dtype=int)
+        window_ends = np.asarray(ends, dtype=int)
+        window_scores = np.asarray(scores, dtype=float)
+
+        best_idx = int(np.argmax(window_scores))
+        best_start = int(window_starts[best_idx])
+        best_end = int(window_ends[best_idx])
+        best_score = float(window_scores[best_idx])
+
+        if best_score < self.global_threshold:
+            return (best_start, best_end), best_score
+
+        dyn_threshold = max(self.global_threshold, best_score - self.cluster_delta)
+        candidate_idx = np.where(window_scores >= dyn_threshold)[0]
+        if self.cluster_overlap_only:
+            candidate_idx = np.asarray(
+                [
+                    i
+                    for i in candidate_idx
+                    if not (int(window_ends[i]) < best_start or int(window_starts[i]) > best_end)
+                ],
+                dtype=int,
+            )
+            if candidate_idx.size == 0:
+                candidate_idx = np.asarray([best_idx], dtype=int)
+
+        if candidate_idx.size >= self.cluster_min_windows:
+            merged_start = int(np.min(window_starts[candidate_idx]))
+            merged_end = int(np.max(window_ends[candidate_idx]))
+            return (merged_start, merged_end), best_score
 
         return best_window, float(best_score if best_score > -1e8 else 0.0)
 
@@ -239,6 +365,28 @@ class SemanticExtractor:
                 continue
 
             start_line, end_line = best_window
+            line_pos_scores, line_neg_scores = self._window_line_scores(line_embeddings)
+            trimmed_start, trimmed_end = self._trim_window(
+                lines,
+                line_pos_scores,
+                line_neg_scores,
+                start_line,
+                end_line,
+            )
+            if trimmed_start is None or trimmed_end is None:
+                results.append(
+                    SemanticResult(
+                        text="",
+                        score=max(0.0, float(best_score)),
+                        start_line=None,
+                        end_line=None,
+                        matched=False,
+                        line_scores=[0.0 for _ in lines],
+                    )
+                )
+                continue
+
+            start_line, end_line = trimmed_start, trimmed_end
             matched_text = "\n".join(lines[start_line : end_line + 1]).strip()
             line_scores = [0.0 for _ in lines]
             for idx in range(start_line, end_line + 1):
