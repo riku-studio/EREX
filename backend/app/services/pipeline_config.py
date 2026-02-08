@@ -220,6 +220,7 @@ class PipelineConfigService:
         search = semantic.get("search", {}) if isinstance(semantic.get("search", {}), dict) else {}
         cfg.SEMANTIC_POS_TOP_K = int(search.get("pos_top_k", cfg.SEMANTIC_POS_TOP_K))
         cfg.SEMANTIC_NEGATIVE_WEIGHT = float(search.get("negative_weight", cfg.SEMANTIC_NEGATIVE_WEIGHT))
+        cfg.SEMANTIC_NEGATIVE_POWER = float(search.get("negative_power", cfg.SEMANTIC_NEGATIVE_POWER))
         cfg.SEMANTIC_LENGTH_PENALTY = float(search.get("length_penalty", cfg.SEMANTIC_LENGTH_PENALTY))
         cfg.SEMANTIC_LENGTH_REWARD = float(search.get("length_reward", cfg.SEMANTIC_LENGTH_REWARD))
         cfg.SEMANTIC_CENTER_WEIGHT = float(search.get("center_weight", cfg.SEMANTIC_CENTER_WEIGHT))

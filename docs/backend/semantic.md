@@ -17,6 +17,7 @@
   - `search`: 窗口搜索参数：
     - `pos_top_k`（正向模板取 top-k 相似度均值）
     - `negative_weight`
+    - `negative_power`
     - `length_penalty`
     - `length_reward`
     - `center_weight`
@@ -36,7 +37,7 @@
 2. 将过滤结果按行切分，移除空行。
 3. 对每一行做 embedding，并使用前缀和快速构造任意连续窗口向量。
 4. 对所有连续窗口（长度范围 `min_lines..window_max_lines`）计算分数：  
-   `window_score = mean(top-k sim(global)) - negative_weight * max(sim(negative)) - length_penalty * log(1+lines) + length_reward * log(1+lines) + center_weight * center_score`
+   `window_score = mean(top-k sim(global)) - negative_weight * (max(sim(negative)) ^ negative_power) - length_penalty * log(1+lines) + length_reward * log(1+lines) + center_weight * center_score`
 5. `center_score` 基于窗口中心与正文中心的距离，越靠近正文中部得分越高（0~1）。
 6. 以最高分窗口为核心，收集 `score >= max(global_threshold, best_score - cluster_delta)` 的候选窗口；若候选数达到 `cluster_min_windows`，并在 `cluster_overlap_only=true` 下与核心窗口重叠，则合并成更完整边界。
 7. 对合并后的边界做头尾裁剪：
@@ -59,12 +60,13 @@
   - `global_threshold=0.15`
   - `search.pos_top_k=3`
   - `search.negative_weight=0.15`
+  - `search.negative_power=1.4`
   - `search.length_penalty=0.0`
-  - `search.length_reward=0.01`
+  - `search.length_reward=0.0`
   - `search.center_weight=0.0`
   - `search.min_lines=2`
   - `search.window_max_lines=44`
-  - `search.cluster_delta=0.18`
+  - `search.cluster_delta=0.22`
   - `search.cluster_min_windows=6`
   - `search.cluster_overlap_only=true`
   - `search.trim_tail_neg_threshold=0.35`
@@ -88,10 +90,10 @@
   - 计算 `line_diff = |pred_start-gold_start| + |pred_end-gold_end|`。
 - 全量目标：最小化 `total_line_diff = Σ line_diff`。
 - 本轮最优（含增强负模板）：
-  - `total_line_diff=795`
-  - `avg_line_diff=5.1623`
-  - `exact_match_rows=25/154`
-  - `exact_rate=0.1623`
+  - `total_line_diff=794`（按当前 `semantic.py` 真实运行复评）
+  - `avg_line_diff=5.1558`
+  - `exact_match_rows=26/154`
+  - `exact_rate=0.1688`
 
 ## 如何获取最优规则/超参
 1. 构造 gold 标注：

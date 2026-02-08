@@ -92,6 +92,7 @@ class SemanticExtractor:
         self.negative_embeddings = self._embed(self.negative_templates)
         self.field_embeddings = {name: self._embed(values) for name, values in self.field_templates.items() if values}
         self.negative_weight = Config.SEMANTIC_NEGATIVE_WEIGHT
+        self.negative_power = max(1.0, Config.SEMANTIC_NEGATIVE_POWER)
         self.pos_top_k = max(1, Config.SEMANTIC_POS_TOP_K)
         self.length_penalty = Config.SEMANTIC_LENGTH_PENALTY
         self.length_reward = Config.SEMANTIC_LENGTH_REWARD
@@ -174,11 +175,12 @@ class SemanticExtractor:
         # Tuned base rule: mean_pos_max_neg + length/center terms.
         pos = self._mean_topk_sim(window_embedding, self.global_embeddings, self.pos_top_k)
         neg = self._max_sim(window_embedding, self.negative_embeddings)
+        neg_term = float(np.power(max(0.0, neg), self.negative_power))
         center_bonus = self.center_weight * self._center_score(start, end, total_lines)
         length_term = float(np.log1p(window_len))
         return (
             pos
-            - (self.negative_weight * neg)
+            - (self.negative_weight * neg_term)
             - (self.length_penalty * length_term)
             + (self.length_reward * length_term)
             + center_bonus
