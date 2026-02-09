@@ -208,6 +208,7 @@ class Config:
     SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "").strip()
     SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
     SEMANTIC_SHOW_PROGRESS = os.getenv("SEMANTIC_SHOW_PROGRESS", "false").lower() == "true"
+    SEMANTIC_WINDOW_WORKERS = max(1, int(os.getenv("SEMANTIC_WINDOW_WORKERS", "1")))
     SEMANTIC_TEMPLATES_PATH = os.getenv("SEMANTIC_TEMPLATES_PATH", _default_semantic_templates_path())
     SEMANTIC_POS_TEMPLATES_PATH = os.getenv("SEMANTIC_POS_TEMPLATES_PATH", _default_semantic_pos_templates_path())
     SEMANTIC_NEG_TEMPLATES_PATH = os.getenv("SEMANTIC_NEG_TEMPLATES_PATH", _default_semantic_neg_templates_path())
@@ -312,6 +313,7 @@ class Config:
         .split(",")
     )
     PIPELINE_PREPROCESS_WORKERS = max(1, int(os.getenv("PIPELINE_PREPROCESS_WORKERS", "1")))
+    PIPELINE_AGGREGATE_WORKERS = max(1, int(os.getenv("PIPELINE_AGGREGATE_WORKERS", "1")))
 
     # Lightweight line filter (between cleaner and semantic)
     ENABLE_LINE_FILTER = os.getenv("ENABLE_LINE_FILTER", "true").lower() == "true"
@@ -350,6 +352,7 @@ class Config:
             "semantic_accelerator": cls.SEMANTIC_ACCELERATOR,
             "semantic_device": cls.semantic_runtime_device(),
             "semantic_show_progress": cls.SEMANTIC_SHOW_PROGRESS,
+            "semantic_window_workers": cls.SEMANTIC_WINDOW_WORKERS,
             "semantic_templates_path": cls.SEMANTIC_TEMPLATES_PATH,
             "semantic_pos_templates_path": cls.SEMANTIC_POS_TEMPLATES_PATH,
             "semantic_neg_templates_path": cls.SEMANTIC_NEG_TEMPLATES_PATH,
@@ -391,6 +394,7 @@ class Config:
             "index_rules_path": cls.INDEX_RULES_PATH,
             "index_rule_table": cls.INDEX_RULE_TABLE,
             "pipeline_preprocess_workers": cls.PIPELINE_PREPROCESS_WORKERS,
+            "pipeline_aggregate_workers": cls.PIPELINE_AGGREGATE_WORKERS,
         }
 
     @classmethod

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import re
 from dataclasses import dataclass
@@ -111,6 +112,7 @@ class SemanticExtractor:
         self.boundary_head_run = max(0, Config.SEMANTIC_BOUNDARY_HEAD_RUN)
         self.window_max_lines = max(1, Config.SEMANTIC_WINDOW_MAX_LINES)
         self.min_lines = max(1, Config.SEMANTIC_MIN_LINES)
+        self.window_workers = max(1, Config.SEMANTIC_WINDOW_WORKERS)
 
     def _embed(self, sentences: Sequence[str]) -> np.ndarray:
         if not sentences:
@@ -402,6 +404,96 @@ class SemanticExtractor:
 
         return best_window, float(best_score if best_score > -1e8 else 0.0)
 
+    def _extract_one_from_embeddings(
+        self, lines: Sequence[str], line_embeddings: np.ndarray
+    ) -> Tuple[SemanticResult, Optional[float]]:
+        if not lines:
+            return (
+                SemanticResult(
+                    text="",
+                    score=0.0,
+                    start_line=None,
+                    end_line=None,
+                    matched=False,
+                    line_scores=[],
+                ),
+                None,
+            )
+
+        best_window, best_score = self._search_best_window(line_embeddings)
+        if best_window is None or best_score < self.global_threshold:
+            return (
+                SemanticResult(
+                    text="",
+                    score=max(0.0, float(best_score)),
+                    start_line=None,
+                    end_line=None,
+                    matched=False,
+                    line_scores=[0.0 for _ in lines],
+                ),
+                best_score,
+            )
+
+        start_line, end_line = best_window
+        line_pos_scores, line_neg_scores = self._window_line_scores(line_embeddings)
+        trimmed_start, trimmed_end = self._trim_window(
+            lines,
+            line_pos_scores,
+            line_neg_scores,
+            start_line,
+            end_line,
+        )
+        if trimmed_start is None or trimmed_end is None:
+            return (
+                SemanticResult(
+                    text="",
+                    score=max(0.0, float(best_score)),
+                    start_line=None,
+                    end_line=None,
+                    matched=False,
+                    line_scores=[0.0 for _ in lines],
+                ),
+                best_score,
+            )
+
+        start_line, end_line = trimmed_start, trimmed_end
+        refined_start, refined_end = self._refine_boundary_by_negative_runs(
+            lines,
+            line_pos_scores,
+            line_neg_scores,
+            start_line,
+            end_line,
+        )
+        if refined_start is None or refined_end is None:
+            return (
+                SemanticResult(
+                    text="",
+                    score=max(0.0, float(best_score)),
+                    start_line=None,
+                    end_line=None,
+                    matched=False,
+                    line_scores=[0.0 for _ in lines],
+                ),
+                best_score,
+            )
+
+        start_line, end_line = refined_start, refined_end
+        matched_text = "\n".join(lines[start_line : end_line + 1]).strip()
+        line_scores = [0.0 for _ in lines]
+        for idx in range(start_line, end_line + 1):
+            line_scores[idx] = float(best_score)
+        return (
+            SemanticResult(
+                text=matched_text,
+                score=float(best_score),
+                start_line=start_line,
+                end_line=end_line,
+                matched=True,
+                line_scores=line_scores,
+            ),
+            best_score,
+        )
+
     def extract_batch(self, bodies: Sequence[str]) -> List[Optional[SemanticResult]]:
         lines_per_body: List[List[str]] = []
         for body in bodies:
@@ -423,89 +515,55 @@ class SemanticExtractor:
             cursor += len(lines)
             offsets.append((start, cursor))
 
-        results: List[Optional[SemanticResult]] = []
-        best_scores: List[float] = []
-        for lines, (start, end) in zip(lines_per_body, offsets):
-            if not lines:
-                results.append(None)
-                continue
+        results: List[Optional[SemanticResult]] = [None for _ in lines_per_body]
+        best_scores: List[Tuple[int, float]] = []
+        tasks = [(idx, lines, start, end) for idx, (lines, (start, end)) in enumerate(zip(lines_per_body, offsets))]
 
-            line_embeddings = all_line_embeddings[start:end]
-            best_window, best_score = self._search_best_window(line_embeddings)
-            best_scores.append(best_score)
-
-            if best_window is None or best_score < self.global_threshold:
-                results.append(
-                    SemanticResult(
-                        text="",
-                        score=max(0.0, float(best_score)),
-                        start_line=None,
-                        end_line=None,
-                        matched=False,
-                        line_scores=[0.0 for _ in lines],
-                    )
-                )
-                continue
-
-            start_line, end_line = best_window
-            line_pos_scores, line_neg_scores = self._window_line_scores(line_embeddings)
-            trimmed_start, trimmed_end = self._trim_window(
-                lines,
-                line_pos_scores,
-                line_neg_scores,
-                start_line,
-                end_line,
-            )
-            if trimmed_start is None or trimmed_end is None:
-                results.append(
-                    SemanticResult(
-                        text="",
-                        score=max(0.0, float(best_score)),
-                        start_line=None,
-                        end_line=None,
-                        matched=False,
-                        line_scores=[0.0 for _ in lines],
-                    )
-                )
-                continue
-
-            start_line, end_line = trimmed_start, trimmed_end
-            refined_start, refined_end = self._refine_boundary_by_negative_runs(
-                lines,
-                line_pos_scores,
-                line_neg_scores,
-                start_line,
-                end_line,
-            )
-            if refined_start is None or refined_end is None:
-                results.append(
-                    SemanticResult(
-                        text="",
-                        score=max(0.0, float(best_score)),
-                        start_line=None,
-                        end_line=None,
-                        matched=False,
-                        line_scores=[0.0 for _ in lines],
-                    )
-                )
-                continue
-            start_line, end_line = refined_start, refined_end
-            matched_text = "\n".join(lines[start_line : end_line + 1]).strip()
-            line_scores = [0.0 for _ in lines]
-            for idx in range(start_line, end_line + 1):
-                line_scores[idx] = float(best_score)
-            results.append(
-                SemanticResult(
-                    text=matched_text,
-                    score=float(best_score),
-                    start_line=start_line,
-                    end_line=end_line,
-                    matched=True,
-                    line_scores=line_scores,
-                )
+        if self.window_workers <= 1 or len(tasks) <= 1:
+            for idx, lines, start, end in tasks:
+                if not lines:
+                    continue
+                result, score = self._extract_one_from_embeddings(lines, all_line_embeddings[start:end])
+                results[idx] = result
+                if score is not None:
+                    best_scores.append((idx, float(score)))
+        else:
+            logger.info(
+                "Semantic window parallel enabled: workers=%d, bodies=%d",
+                self.window_workers,
+                len(tasks),
             )
 
-        top_samples = sorted(enumerate(best_scores), key=lambda item: item[1], reverse=True)[:5]
+            def _run_one(task: Tuple[int, List[str], int, int]) -> Tuple[int, SemanticResult, Optional[float]]:
+                idx_local, lines_local, start_local, end_local = task
+                result_local, score_local = self._extract_one_from_embeddings(
+                    lines_local,
+                    all_line_embeddings[start_local:end_local],
+                )
+                return idx_local, result_local, score_local
+
+            with ThreadPoolExecutor(max_workers=self.window_workers) as pool:
+                futures = [pool.submit(_run_one, task) for task in tasks if task[1]]
+                for fut in as_completed(futures):
+                    idx, result, score = fut.result()
+                    results[idx] = result
+                    if score is not None:
+                        best_scores.append((idx, float(score)))
+
+        for idx, lines in enumerate(lines_per_body):
+            if lines and results[idx] is None:
+                results[idx] = SemanticResult(
+                    text="",
+                    score=0.0,
+                    start_line=None,
+                    end_line=None,
+                    matched=False,
+                    line_scores=[0.0 for _ in lines],
+                )
+            elif not lines:
+                results[idx] = None
+
+        top_samples = sorted(best_scores, key=lambda item: item[1], reverse=True)[:5]
         logger.info(
             "Semantic window scoring: bodies=%d, threshold=%.3f, top_scores=%s",
             len(lines_per_body),

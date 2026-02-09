@@ -34,6 +34,7 @@ class Pipeline:
         self.config = config
         self.steps = [step.strip() for step in config.PIPELINE_STEPS if step.strip()]
         self.preprocess_workers = max(1, int(getattr(config, "PIPELINE_PREPROCESS_WORKERS", 1)))
+        self.aggregate_workers = max(1, int(getattr(config, "PIPELINE_AGGREGATE_WORKERS", 1)))
 
         self.line_filter = LineFilter(config) if "line_filter" in self.steps else None
         self.splitter = Splitter(config) if "splitter" in self.steps else None
@@ -150,23 +151,67 @@ class Pipeline:
 
         results: List[PipelineResult] = []
         _notify(70.0, "aggregate", "Splitting and aggregating statistics", 0, total_messages)
-        for item, semantic_result in zip(prepared, semantic_results):
-            msg = item["message"]
-            body_filtered = item["body_filtered"]
-            blocks = self._split(body_filtered)
-            aggregation = (
-                self.aggregator.aggregate_blocks(blocks) if "aggregator" in self.steps else {"blocks": [], "summary": {}}
-            )
-            results.append(
-                PipelineResult(
-                    source_path=getattr(msg, "source_path", ""),
-                    subject=getattr(msg, "subject", ""),
-                    semantic=semantic_result,
-                    blocks=blocks,
-                    aggregation=aggregation,
+        if self.aggregate_workers <= 1 or total_messages <= 1:
+            for item, semantic_result in zip(prepared, semantic_results):
+                msg = item["message"]
+                body_filtered = item["body_filtered"]
+                blocks = self._split(body_filtered)
+                aggregation = (
+                    self.aggregator.aggregate_blocks(blocks)
+                    if "aggregator" in self.steps
+                    else {"blocks": [], "summary": {}}
                 )
+                results.append(
+                    PipelineResult(
+                        source_path=getattr(msg, "source_path", ""),
+                        subject=getattr(msg, "subject", ""),
+                        semantic=semantic_result,
+                        blocks=blocks,
+                        aggregation=aggregation,
+                    )
+                )
+                done = len(results)
+                aggregate_percent = 70.0 + (30.0 * (done / total_messages) if total_messages else 30.0)
+                _notify(aggregate_percent, "aggregate", "Message aggregation completed", done, total_messages)
+            return results
+
+        logger.info(
+            "Pipeline aggregate parallel enabled: workers=%d, messages=%d",
+            self.aggregate_workers,
+            total_messages,
+        )
+        parallel_results: List[PipelineResult | None] = [None for _ in prepared]
+
+        def _aggregate_one(idx: int, item: dict, semantic_result: SemanticResult | None) -> tuple[int, PipelineResult]:
+            msg_obj = item["message"]
+            body_filtered_local = item["body_filtered"]
+            blocks_local = self._split(body_filtered_local)
+            aggregation_local = (
+                self.aggregator.aggregate_blocks(blocks_local)
+                if "aggregator" in self.steps
+                else {"blocks": [], "summary": {}}
             )
-            done = len(results)
-            aggregate_percent = 70.0 + (30.0 * (done / total_messages) if total_messages else 30.0)
-            _notify(aggregate_percent, "aggregate", "Message aggregation completed", done, total_messages)
-        return results
+            return (
+                idx,
+                PipelineResult(
+                    source_path=getattr(msg_obj, "source_path", ""),
+                    subject=getattr(msg_obj, "subject", ""),
+                    semantic=semantic_result,
+                    blocks=blocks_local,
+                    aggregation=aggregation_local,
+                ),
+            )
+
+        done = 0
+        with ThreadPoolExecutor(max_workers=self.aggregate_workers) as pool:
+            future_map = {
+                pool.submit(_aggregate_one, idx, item, semantic_results[idx]): idx
+                for idx, item in enumerate(prepared)
+            }
+            for fut in as_completed(future_map):
+                idx, result = fut.result()
+                parallel_results[idx] = result
+                done += 1
+                aggregate_percent = 70.0 + (30.0 * (done / total_messages) if total_messages else 30.0)
+                _notify(aggregate_percent, "aggregate", "Message aggregation completed", done, total_messages)
+        return [r for r in parallel_results if r is not None]
