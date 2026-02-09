@@ -311,6 +311,7 @@ class Config:
         .strip()
         .split(",")
     )
+    PIPELINE_PREPROCESS_WORKERS = max(1, int(os.getenv("PIPELINE_PREPROCESS_WORKERS", "1")))
 
     # Lightweight line filter (between cleaner and semantic)
     ENABLE_LINE_FILTER = os.getenv("ENABLE_LINE_FILTER", "true").lower() == "true"
@@ -389,6 +390,7 @@ class Config:
             "index_rule_source": cls.INDEX_RULE_SOURCE,
             "index_rules_path": cls.INDEX_RULES_PATH,
             "index_rule_table": cls.INDEX_RULE_TABLE,
+            "pipeline_preprocess_workers": cls.PIPELINE_PREPROCESS_WORKERS,
         }
 
     @classmethod
