@@ -111,7 +111,7 @@ export interface HistoryRecord {
   id: string;
   title?: string | null;
   saved_at: string;
-  result: RunResponse;
+  summary: RunSummary;
 }
 
 export interface TechInsightRequest {

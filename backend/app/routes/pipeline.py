@@ -104,7 +104,7 @@ class PipelineHistoryRecord(BaseModel):
     id: str
     title: str | None = None
     saved_at: str
-    result: PipelineRunResponse
+    summary: dict
 
 
 class FileUploadResponse(BaseModel):
@@ -162,12 +162,15 @@ def _parse_history_record(path: Path) -> PipelineHistoryRecord | None:
         logger.error("Failed to read history file %s: %s", path, exc)
         return None
 
+    result = data.get("result") or {}
+    summary = result.get("summary") or _empty_run_response().summary
+
     try:
         return PipelineHistoryRecord(
             id=str(data.get("id") or path.stem),
             title=data.get("title"),
             saved_at=str(data.get("saved_at") or ""),
-            result=PipelineRunResponse(**(data.get("result") or _empty_run_response().dict())),
+            summary=summary,
         )
     except Exception as exc:
         logger.error("Failed to parse history payload %s: %s", path, exc)
@@ -179,7 +182,7 @@ def _history_item_from_record(record: PipelineHistoryRecord) -> PipelineHistoryI
         id=record.id,
         title=record.title,
         saved_at=record.saved_at,
-        summary=record.result.summary,
+        summary=record.summary,
     )
 
 
@@ -468,12 +471,7 @@ def save_pipeline_history(payload: PipelineHistorySaveRequest):
     }
     target = _history_file(record_id)
     target.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
-    parsed = PipelineHistoryRecord(
-        id=record_id,
-        title=payload.title,
-        saved_at=saved_at,
-        result=payload.result,
-    )
+    parsed = PipelineHistoryRecord(id=record_id, title=payload.title, saved_at=saved_at, summary=payload.result.summary)
     return _history_item_from_record(parsed)
 
 

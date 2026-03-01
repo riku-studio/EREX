@@ -111,10 +111,10 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Stat label="Messages" value={selectedRecord.result.summary.message_count} icon={<FileText className="w-4 h-4 text-blue-500" />} />
-                <Stat label="Blocks" value={selectedRecord.result.summary.block_count} icon={<BarChart3 className="w-4 h-4 text-indigo-500" />} />
-                <Stat label="Class Types" value={Object.keys(selectedRecord.result.summary.class_summary || {}).length} />
-                <Stat label="Keyword Cats" value={Object.keys(selectedRecord.result.summary.keyword_summary || {}).length} />
+                <Stat label="Messages" value={selectedRecord.summary.message_count} icon={<FileText className="w-4 h-4 text-blue-500" />} />
+                <Stat label="Blocks" value={selectedRecord.summary.block_count} icon={<BarChart3 className="w-4 h-4 text-indigo-500" />} />
+                <Stat label="Class Types" value={Object.keys(selectedRecord.summary.class_summary || {}).length} />
+                <Stat label="Keyword Cats" value={Object.keys(selectedRecord.summary.keyword_summary || {}).length} />
               </div>
 
               <div>
@@ -122,11 +122,11 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
                   <Search className="w-4 h-4 text-brand-600" />
                   Top Keywords
                 </h4>
-                {Object.keys(selectedRecord.result.summary.keyword_summary || {}).length === 0 ? (
+                {Object.keys(selectedRecord.summary.keyword_summary || {}).length === 0 ? (
                   <p className="text-sm text-slate-500">No keyword summary in this run.</p>
                 ) : (
                   <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                    {Object.entries(selectedRecord.result.summary.keyword_summary).map(([category, keywords]) => (
+                    {Object.entries(selectedRecord.summary.keyword_summary).map(([category, keywords]) => (
                       <div key={category} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">{category}</p>
                         {keywords.length === 0 ? (
