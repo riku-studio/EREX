@@ -73,6 +73,15 @@ export interface RunResponse {
   summary: RunSummary;
 }
 
+export interface RunResultPage {
+  results: MailResult[];
+  summary: RunSummary;
+  total: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
+}
+
 export interface RunStartResponse {
   job_id: string;
   status: string;

@@ -9,7 +9,7 @@ from threading import Lock
 from typing import Any, Callable, Dict, List
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
 from app.services.email_parser import parse_email_file
@@ -59,6 +59,15 @@ class PipelineConfigResponse(BaseModel):
 class PipelineRunResponse(BaseModel):
     results: list
     summary: dict
+
+
+class PipelineRunPageResponse(BaseModel):
+    results: list
+    summary: dict
+    total: int
+    offset: int
+    limit: int
+    has_more: bool
 
 
 class PipelineRunStartResponse(BaseModel):
@@ -214,6 +223,22 @@ def _get_pipeline_job(job_id: str) -> Dict[str, Any]:
         if state is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
         return dict(state)
+
+
+def _get_completed_job_payload(job_id: str) -> dict:
+    state = _get_pipeline_job(job_id)
+    state_status = str(state.get("status", "unknown"))
+    if state_status == "failed":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=state.get("error") or "pipeline job failed",
+        )
+    if state_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"job not completed (status={state_status})",
+        )
+    return state.get("result") or _empty_run_response().dict()
 
 
 def _execute_pipeline_run(
@@ -405,20 +430,30 @@ def get_pipeline_progress(job_id: str):
 
 @router.get("/run/{job_id}/result", response_model=PipelineRunResponse)
 def get_pipeline_result(job_id: str):
-    state = _get_pipeline_job(job_id)
-    state_status = str(state.get("status", "unknown"))
-    if state_status == "failed":
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=state.get("error") or "pipeline job failed",
-        )
-    if state_status != "completed":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"job not completed (status={state_status})",
-        )
-    payload = state.get("result") or _empty_run_response().dict()
+    payload = _get_completed_job_payload(job_id)
     return PipelineRunResponse(**payload)
+
+
+@router.get("/run/{job_id}/result/page", response_model=PipelineRunPageResponse)
+def get_pipeline_result_page(
+    job_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=500, ge=1, le=2000),
+):
+    payload = _get_completed_job_payload(job_id)
+    all_results = payload.get("results") or []
+    total = len(all_results)
+    start = min(offset, total)
+    end = min(start + limit, total)
+    page_results = all_results[start:end]
+    return PipelineRunPageResponse(
+        results=page_results,
+        summary=payload.get("summary") or {},
+        total=total,
+        offset=start,
+        limit=limit,
+        has_more=end < total,
+    )
 
 
 @router.post("/history", response_model=PipelineHistoryItem)

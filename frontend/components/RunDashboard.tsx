@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Play, Sparkles, FileText, BarChart2, PieChart as PieIcon, ChevronDown, ChevronUp, Search, Activity, Save } from 'lucide-react';
 import { Button } from './Button';
 import { RunResponse, MailResult, TechInsightRequest, KeywordStat, RunProgressResponse } from '../types';
@@ -11,6 +11,10 @@ interface RunDashboardProps {
   isSavingResult?: boolean;
   canSaveResult?: boolean;
   results: RunResponse | null;
+  totalResults?: number;
+  hasMoreResults?: boolean;
+  isLoadingMoreResults?: boolean;
+  onLoadMoreResults?: () => void;
   progress: RunProgressResponse | null;
   onInsightRequest: (req: TechInsightRequest) => void;
 }
@@ -22,10 +26,15 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({
   isSavingResult,
   canSaveResult = false,
   results,
+  totalResults = 0,
+  hasMoreResults = false,
+  isLoadingMoreResults = false,
+  onLoadMoreResults,
   progress,
   onInsightRequest,
 }) => {
   const [expandedMail, setExpandedMail] = useState<number | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const toggleExpand = (idx: number) => {
     setExpandedMail(expandedMail === idx ? null : idx);
@@ -42,6 +51,24 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({
 
   const progressValue = Math.max(0, Math.min(100, progress?.progress ?? 0));
   const stageLabel = progress?.message || 'Analyzing content and calculating embeddings...';
+  const loadedResults = results?.results.length ?? 0;
+  const displayedTotal = totalResults > 0 ? totalResults : loadedResults;
+
+  useEffect(() => {
+    if (!hasMoreResults || !onLoadMoreResults) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          onLoadMoreResults();
+        }
+      },
+      { rootMargin: '240px 0px' }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreResults, onLoadMoreResults, loadedResults]);
 
   if (!results && !isRunning) {
     return (
@@ -167,7 +194,12 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({
 
           {/* Detailed Results List */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-800 pl-1">Detailed Analysis</h3>
+            <div className="flex items-end justify-between px-1">
+              <h3 className="text-lg font-semibold text-slate-800">Detailed Analysis</h3>
+              <p className="text-xs text-slate-500">
+                Loaded {loadedResults} / {displayedTotal}
+              </p>
+            </div>
             {results.results.map((mail, idx) => (
               <MailCard 
                 key={idx} 
@@ -177,6 +209,11 @@ export const RunDashboard: React.FC<RunDashboardProps> = ({
                 onKeywordClick={handleKeywordClick}
               />
             ))}
+            {hasMoreResults && (
+              <div ref={loadMoreRef} className="rounded-lg border border-dashed border-slate-300 bg-white/80 px-4 py-3 text-center text-sm text-slate-500">
+                {isLoadingMoreResults ? 'Loading more results...' : 'Scroll down to load more'}
+              </div>
+            )}
           </div>
         </>
       )}

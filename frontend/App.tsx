@@ -21,6 +21,7 @@ import { TechInsightModal } from './components/TechInsightModal';
 import { HistoryPanel } from './components/HistoryPanel';
 
 const App: React.FC = () => {
+  const RESULT_PAGE_SIZE = 500;
   // Navigation State
   const [activeTab, setActiveTab] = useState<TabView>('dashboard');
 
@@ -28,6 +29,10 @@ const App: React.FC = () => {
   const [config, setConfig] = useState<PipelineConfig | null>(null);
   const [files, setFiles] = useState<UploadResponseItem[]>([]);
   const [runResults, setRunResults] = useState<RunResponse | null>(null);
+  const [runJobId, setRunJobId] = useState<string | null>(null);
+  const [runTotal, setRunTotal] = useState<number>(0);
+  const [nextResultOffset, setNextResultOffset] = useState<number>(0);
+  const [hasMoreResults, setHasMoreResults] = useState<boolean>(false);
   const [runProgress, setRunProgress] = useState<RunProgressResponse | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyDetail, setHistoryDetail] = useState<HistoryRecord | null>(null);
@@ -39,6 +44,7 @@ const App: React.FC = () => {
   const [running, setRunning] = useState(false);
   const [insightLoading, setInsightLoading] = useState(false);
   const [savingHistory, setSavingHistory] = useState(false);
+  const [loadingMoreResults, setLoadingMoreResults] = useState(false);
   const [loadingHistoryList, setLoadingHistoryList] = useState(false);
   const [loadingHistoryDetail, setLoadingHistoryDetail] = useState(false);
 
@@ -115,10 +121,15 @@ const App: React.FC = () => {
   const handleRun = async () => {
     setRunning(true);
     setRunResults(null);
+    setRunJobId(null);
+    setRunTotal(0);
+    setNextResultOffset(0);
+    setHasMoreResults(false);
     setRunProgress(null);
     setActiveRunHistoryId(null);
     try {
       const started = await api.startPipelineRun();
+      setRunJobId(started.job_id);
       let progress = await api.getPipelineProgress(started.job_id);
       setRunProgress(progress);
 
@@ -132,14 +143,39 @@ const App: React.FC = () => {
         throw new Error(progress.error || 'Pipeline job failed');
       }
 
-      const results = await api.getPipelineResult(started.job_id);
-      setRunResults(results);
+      const firstPage = await api.getPipelineResultPage(started.job_id, 0, RESULT_PAGE_SIZE);
+      setRunResults({
+        results: firstPage.results,
+        summary: firstPage.summary,
+      });
+      setRunTotal(firstPage.total);
+      setNextResultOffset(firstPage.offset + firstPage.results.length);
+      setHasMoreResults(firstPage.has_more);
       setToast({ msg: 'Pipeline finished successfully', type: 'success' });
     } catch (err) {
       console.error(err);
       setToast({ msg: 'Pipeline run failed', type: 'error' });
     } finally {
       setRunning(false);
+    }
+  };
+
+  const handleLoadMoreResults = async () => {
+    if (!runJobId || !hasMoreResults || loadingMoreResults || running) return;
+    setLoadingMoreResults(true);
+    try {
+      const page = await api.getPipelineResultPage(runJobId, nextResultOffset, RESULT_PAGE_SIZE);
+      setRunResults(prev => ({
+        summary: page.summary,
+        results: [...(prev?.results || []), ...page.results],
+      }));
+      setRunTotal(page.total);
+      setNextResultOffset(page.offset + page.results.length);
+      setHasMoreResults(page.has_more);
+    } catch (err) {
+      setToast({ msg: 'Failed to load more results', type: 'error' });
+    } finally {
+      setLoadingMoreResults(false);
     }
   };
 
@@ -160,10 +196,11 @@ const App: React.FC = () => {
   };
 
   const handleSaveRunResult = async () => {
-    if (!runResults || activeRunHistoryId) return;
+    if ((!runResults && !runJobId) || activeRunHistoryId) return;
     setSavingHistory(true);
     try {
-      const saved = await api.savePipelineHistory(runResults);
+      const fullResult = runJobId ? await api.getPipelineResult(runJobId) : runResults!;
+      const saved = await api.savePipelineHistory(fullResult);
       setActiveRunHistoryId(saved.id);
       setToast({ msg: 'Run result saved', type: 'success' });
       await loadHistory();
@@ -275,6 +312,10 @@ const App: React.FC = () => {
               isSavingResult={savingHistory}
               canSaveResult={!!runResults && !activeRunHistoryId}
               results={runResults}
+              totalResults={runTotal}
+              hasMoreResults={hasMoreResults}
+              isLoadingMoreResults={loadingMoreResults}
+              onLoadMoreResults={handleLoadMoreResults}
               progress={runProgress}
               onInsightRequest={handleTechInsight}
             />

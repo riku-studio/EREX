@@ -3,6 +3,7 @@ import {
   UploadResponseItem, 
   DeleteResponse, 
   RunResponse, 
+  RunResultPage,
   RunStartResponse,
   RunProgressResponse,
   HistoryItem,
@@ -92,6 +93,15 @@ export const api = {
   getPipelineResult: async (jobId: string): Promise<RunResponse> => {
     const res = await fetch(`${API_BASE}/pipeline/run/${jobId}/result`);
     return handleResponse<RunResponse>(res);
+  },
+
+  getPipelineResultPage: async (jobId: string, offset = 0, limit = 500): Promise<RunResultPage> => {
+    const query = new URLSearchParams({
+      offset: String(offset),
+      limit: String(limit),
+    });
+    const res = await fetch(`${API_BASE}/pipeline/run/${jobId}/result/page?${query.toString()}`);
+    return handleResponse<RunResultPage>(res);
   },
 
   savePipelineHistory: async (result: RunResponse, title?: string): Promise<HistoryItem> => {
