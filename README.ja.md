@@ -39,6 +39,8 @@ docker compose up --build
 
 - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`
 - `SEMANTIC_DEVICE=`（任意、例: `cuda:0`）
+- `SEMANTIC_MODEL_AUTO_UNLOAD=true|false`（アイドル時に GPU モデルを自動解放）
+- `SEMANTIC_MODEL_IDLE_SECONDS=600`（アンロードまでのアイドル秒数）
 
 GPU 確認:
 

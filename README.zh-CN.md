@@ -39,6 +39,8 @@ docker compose up --build
 
 - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`
 - `SEMANTIC_DEVICE=`（可选，如 `cuda:0`）
+- `SEMANTIC_MODEL_AUTO_UNLOAD=true|false`（空闲时自动释放 GPU 模型）
+- `SEMANTIC_MODEL_IDLE_SECONDS=600`（空闲多少秒后卸载）
 
 容器内检查 GPU：
 

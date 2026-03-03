@@ -45,6 +45,8 @@ Configure in `.env`:
 
 - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`
 - `SEMANTIC_DEVICE=` (optional, e.g. `cuda:0`)
+- `SEMANTIC_MODEL_AUTO_UNLOAD=true|false` (auto release GPU model when idle)
+- `SEMANTIC_MODEL_IDLE_SECONDS=600` (idle timeout before unload)
 
 Check GPU in container:
 

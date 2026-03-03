@@ -9,6 +9,8 @@
   - `SEMANTIC_ACCELERATOR=cpu|gpu|auto`：语义计算模式开关。
   - `SEMANTIC_DEVICE=`：可选设备覆盖（如 `cpu` / `cuda` / `cuda:0` / `mps`），优先级高于 `SEMANTIC_ACCELERATOR`。
   - 当 `SEMANTIC_ACCELERATOR=gpu|auto` 且 CUDA 可用时，运行设备自动选择 `cuda`，否则回退 `cpu`。
+  - `SEMANTIC_MODEL_AUTO_UNLOAD=true|false`：启用空闲自动卸载（仅 CUDA 设备生效）。
+  - `SEMANTIC_MODEL_IDLE_SECONDS=600`：模型空闲多久后自动从显存卸载。
 - 结构：
   - `context_radius`：构造上下文 segment 时包含的前后行数。
   - `global_threshold`：判断 segment 是否为求人块的全局阈值。

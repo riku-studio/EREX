@@ -206,6 +206,8 @@ class Config:
     SEMANTIC_THRESHOLD = float(os.getenv("SEMANTIC_THRESHOLD", 0.55))
     SEMANTIC_ACCELERATOR = os.getenv("SEMANTIC_ACCELERATOR", "cpu").strip().lower()
     SEMANTIC_DEVICE = os.getenv("SEMANTIC_DEVICE", "").strip()
+    SEMANTIC_MODEL_AUTO_UNLOAD = os.getenv("SEMANTIC_MODEL_AUTO_UNLOAD", "true").lower() == "true"
+    SEMANTIC_MODEL_IDLE_SECONDS = max(30, int(os.getenv("SEMANTIC_MODEL_IDLE_SECONDS", "600")))
     SEMANTIC_BATCH_SIZE = int(os.getenv("SEMANTIC_BATCH_SIZE", 64))
     SEMANTIC_SHOW_PROGRESS = os.getenv("SEMANTIC_SHOW_PROGRESS", "false").lower() == "true"
     SEMANTIC_WINDOW_WORKERS = max(1, int(os.getenv("SEMANTIC_WINDOW_WORKERS", "1")))
@@ -351,6 +353,8 @@ class Config:
             "semantic_threshold": cls.SEMANTIC_THRESHOLD,
             "semantic_accelerator": cls.SEMANTIC_ACCELERATOR,
             "semantic_device": cls.semantic_runtime_device(),
+            "semantic_model_auto_unload": cls.SEMANTIC_MODEL_AUTO_UNLOAD,
+            "semantic_model_idle_seconds": cls.SEMANTIC_MODEL_IDLE_SECONDS,
             "semantic_show_progress": cls.SEMANTIC_SHOW_PROGRESS,
             "semantic_window_workers": cls.SEMANTIC_WINDOW_WORKERS,
             "semantic_templates_path": cls.SEMANTIC_TEMPLATES_PATH,

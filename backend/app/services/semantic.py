@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import gc
 import logging
 import re
+import time
 from dataclasses import dataclass
-from functools import lru_cache
+from threading import Lock, Timer
 from typing import Dict, List, Optional, Protocol, Sequence, Tuple
 
 import numpy as np
@@ -29,8 +31,85 @@ class SemanticResult:
     line_scores: List[float]
 
 
-@lru_cache(maxsize=1)
+_MODEL_LOCK = Lock()
+_MODEL: EmbeddingModel | None = None
+_MODEL_LAST_USED = 0.0
+_MODEL_UNLOAD_TIMER: Timer | None = None
+
+
+def _supports_auto_unload() -> bool:
+    # Auto-unload is only meaningful on CUDA-like devices.
+    device = Config.semantic_runtime_device().lower()
+    return Config.SEMANTIC_MODEL_AUTO_UNLOAD and device.startswith("cuda")
+
+
+def _cancel_unload_timer_locked() -> None:
+    global _MODEL_UNLOAD_TIMER
+    if _MODEL_UNLOAD_TIMER is not None:
+        _MODEL_UNLOAD_TIMER.cancel()
+        _MODEL_UNLOAD_TIMER = None
+
+
+def _schedule_unload_timer_locked() -> None:
+    global _MODEL_UNLOAD_TIMER
+    if _MODEL is None or not _supports_auto_unload():
+        return
+    _cancel_unload_timer_locked()
+    timeout = max(30, int(Config.SEMANTIC_MODEL_IDLE_SECONDS))
+    timer = Timer(timeout, _unload_model_if_idle)
+    timer.daemon = True
+    _MODEL_UNLOAD_TIMER = timer
+    timer.start()
+
+
+def _mark_model_used() -> None:
+    global _MODEL_LAST_USED
+    with _MODEL_LOCK:
+        if _MODEL is None:
+            return
+        _MODEL_LAST_USED = time.monotonic()
+        _schedule_unload_timer_locked()
+
+
+def _unload_model_if_idle() -> None:
+    global _MODEL, _MODEL_UNLOAD_TIMER
+    model_to_release: EmbeddingModel | None = None
+    with _MODEL_LOCK:
+        _MODEL_UNLOAD_TIMER = None
+        if _MODEL is None or not _supports_auto_unload():
+            return
+        idle_for = time.monotonic() - _MODEL_LAST_USED
+        timeout = max(30, int(Config.SEMANTIC_MODEL_IDLE_SECONDS))
+        if idle_for < timeout:
+            _schedule_unload_timer_locked()
+            return
+        model_to_release = _MODEL
+        _MODEL = None
+
+    if model_to_release is None:
+        return
+
+    # Release Python references and let CUDA allocator return cached blocks.
+    del model_to_release
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+    logger.info("Semantic model auto-unloaded after %ds idle", max(30, int(Config.SEMANTIC_MODEL_IDLE_SECONDS)))
+
+
 def _load_model() -> EmbeddingModel:
+    global _MODEL, _MODEL_LAST_USED
+    with _MODEL_LOCK:
+        if _MODEL is not None:
+            _MODEL_LAST_USED = time.monotonic()
+            _schedule_unload_timer_locked()
+            return _MODEL
+
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError as exc:  # pragma: no cover - optional dependency
@@ -46,7 +125,10 @@ def _load_model() -> EmbeddingModel:
         resolved_device,
         Config.SEMANTIC_BATCH_SIZE,
     )
-    return SentenceTransformer(Config.SEMANTIC_MODEL, device=resolved_device)
+    _MODEL = SentenceTransformer(Config.SEMANTIC_MODEL, device=resolved_device)
+    _MODEL_LAST_USED = time.monotonic()
+    _schedule_unload_timer_locked()
+    return _MODEL
 
 
 def prepare_semantic_input(body: str, line_filter: LineFilter | None = None) -> str:
@@ -117,12 +199,14 @@ class SemanticExtractor:
     def _embed(self, sentences: Sequence[str]) -> np.ndarray:
         if not sentences:
             return np.empty((0, 0), dtype=float)
+        _mark_model_used()
         embeddings = self.model.encode(
             sentences,
             batch_size=Config.SEMANTIC_BATCH_SIZE,
             show_progress_bar=Config.SEMANTIC_SHOW_PROGRESS,
             normalize_embeddings=True,
         )
+        _mark_model_used()
         return np.asarray(embeddings, dtype=float)
 
     def _max_sim(self, embedding: np.ndarray, templates: np.ndarray) -> float:
