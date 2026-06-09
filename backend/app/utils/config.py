@@ -17,10 +17,14 @@ load_dotenv()
 # 当前项目根目录（兼容容器路径 /app/app/utils 与本地路径 backend/app/utils）
 def _detect_project_root() -> Path:
     base = Path(__file__).resolve()
+
     for candidate in base.parents:
-        # 本地开发：repo 根包含 backend 目录
+        # 本地开发：repo 根包含 backend 目录。
+        # backend/ 自身也包含 app/config，因此必须优先完整扫描 repo 根。
         if (candidate / "backend").exists():
             return candidate
+
+    for candidate in base.parents:
         # 容器内：/app 下有 config 目录
         if (candidate / "config").exists() and (candidate / "app").exists():
             return candidate
