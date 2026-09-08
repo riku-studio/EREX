@@ -56,7 +56,6 @@ fi
 
 "${codex_environment[@]}" codex exec \
   --cd "$GITHUB_WORKSPACE" \
-  --sandbox workspace-write \
   --approve-for-me \
   --color never \
   --output-last-message "$final_message_file" \

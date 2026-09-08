@@ -53,7 +53,6 @@ fi
 
 "${codex_environment[@]}" codex exec \
   --cd "$GITHUB_WORKSPACE" \
-  --sandbox workspace-write \
   --approve-for-me \
   --color never \
   --json \
