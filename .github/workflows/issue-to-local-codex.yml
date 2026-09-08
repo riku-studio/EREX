@@ -1,0 +1,101 @@
+name: Issue to local Codex
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: codex-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event.label.name == 'codex'
+    runs-on: [self-hosted, linux, codex-local]
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify local tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v codex
+          command -v gh
+          command -v jq
+          codex login status
+
+      - name: Let local Codex implement the issue
+        id: codex
+        shell: bash
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: scripts/run-codex-issue.sh
+
+      - name: Publish a pull request
+        if: steps.codex.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          CODEX_FINAL_MESSAGE_FILE: ${{ runner.temp }}/codex-final-message.md
+        run: |
+          set -euo pipefail
+
+          branch="codex/issue-${ISSUE_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "codex-local[bot]"
+          git config user.email "codex-local[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A
+          git commit -m "fix: resolve issue #${ISSUE_NUMBER}"
+
+          auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push origin "HEAD:refs/heads/${branch}"
+
+          pr_body="${RUNNER_TEMP}/codex-pr-body.md"
+          {
+            printf 'Closes #%s\n\n' "$ISSUE_NUMBER"
+            printf '## Codex 执行摘要\n\n'
+            if [[ -s "$CODEX_FINAL_MESSAGE_FILE" ]]; then
+              sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
+            else
+              printf 'Codex 已完成修改；没有生成执行摘要。\n'
+            fi
+            printf '\n\n---\n由本地 self-hosted runner 上的 Codex 自动生成，请在合并前审查。\n'
+          } > "$pr_body"
+
+          pr_url="$(gh pr create \
+            --base "$DEFAULT_BRANCH" \
+            --head "$branch" \
+            --title "fix: resolve issue #${ISSUE_NUMBER}" \
+            --body-file "$pr_body")"
+          gh issue comment "$ISSUE_NUMBER" --body "本地 Codex 已创建 PR：${pr_url}"
+
+      - name: Report that no patch was needed
+        if: steps.codex.outputs.changed == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          CODEX_FINAL_MESSAGE_FILE: ${{ runner.temp }}/codex-final-message.md
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/codex-no-change.md"
+          {
+            printf '本地 Codex 已完成分析，但没有产生代码改动。\n\n'
+            sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
+          } > "$body"
+          gh issue comment "$ISSUE_NUMBER" --body-file "$body"

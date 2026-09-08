@@ -83,6 +83,10 @@ npm install
 npm run dev
 ```
 
+## GitHub Issue 自动交给本地 Codex
+
+仓库提供了一个基于 self-hosted runner 的试验性工作流：维护者给 Issue 添加 `codex` 标签后，本地 Codex CLI 会尝试实现需求、运行验证并创建 PR。安装和安全配置见 [GitHub Issue 驱动本地 Codex](docs/ops/github-issue-codex.md)。
+
 ## 配置来源
 
 Pipeline 配置默认从文件加载。数据库可用时会切换为 `db` 来源；不可用则回退为 `file`。
