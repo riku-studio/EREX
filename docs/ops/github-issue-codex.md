@@ -169,15 +169,13 @@ sequenceDiagram
 - `main` 中的 `backend/**`、`frontend/**` 或 `infra/docker-compose.yml` 发生变化；
 - 维护者在 Actions 页面手动执行 `workflow_dispatch`。
 
-部署工作流使用固定的 Compose project 名 `infra`，以匹配当前 Compose 项目并更新已有容器。它执行配置校验、`docker compose up -d --build --remove-orphans`，然后通过 `http://127.0.0.1:8002/health` 验证前端和后端链路。失败时输出容器状态和最近 200 行日志；当前不自动回滚。
+部署工作流使用固定的 Compose project 名 `infra`，在本机 `/home/judgelight/share/projects/EREX/infra` 内校验配置并执行 `docker compose up -d --build --remove-orphans`。随后检查 `/health` 和前端首页，每次请求连接超时 3 秒、总超时 10 秒，最多尝试 12 次。失败时输出容器状态和最近 200 行日志；当前不自动回滚。
 
-在 GitHub 仓库 `Settings → Secrets and variables → Actions → Variables` 中创建变量：
+无需配置 `EREX_ENV_FILE`。Compose 直接读取当前项目的 `.env` 和 `/srv/secrets/litellm.env`；`.env` 和 `data/` 由 Git 忽略，不上传 GitHub。Runner 服务用户必须能读取环境文件、操作 Docker daemon，并且本机必须已存在 `shared_network` 和 `ollama_default` 两个外部网络。
 
-```text
-EREX_ENV_FILE=/home/judgelight/share/projects/EREX/.env
-```
+工作流仅允许从 `main` 部署，固定事件 SHA，并在运行摘要记录版本。先从 Actions checkout 获取该提交，再对本机项目执行快进更新。若本机不是 main、有未提交改动、已有领先提交或分支分叉，则停止并保留现场，不 reset 或 clean 本机项目。迁移机器时需修改 workflow 中的本机路径。
 
-变量只保存本机文件路径，不保存 `.env` 内容。Runner 服务用户必须能读取该文件、访问 `/srv/secrets/litellm.env`、操作 Docker daemon，并且本机必须已经存在 `shared_network` 和 `ollama_default` 两个外部网络。部署时工作流在临时 checkout 中创建 `.env` 符号链接，结束后立即删除。
+部署目录的调整不会自动增加数据持久化。本次不修改现有容器挂载，不执行备份或迁移；容器内未挂载的数据仍会在容器被重建时丢失。
 
 > 如果当前运行的 Compose project 名不是 `infra`，必须在部署前把 workflow 中的 `COMPOSE_PROJECT_NAME` 调整为实际名称，否则可能创建第二套容器而不是更新现有容器。可用 `docker compose -f infra/docker-compose.yml ls` 或容器的 `com.docker.compose.project` 标签确认。
 
@@ -233,7 +231,9 @@ Issue 中至少写清楚：
 
 维护者确认 Issue 适合自动执行后添加 `codex` 标签。可在仓库的 Actions 页面查看实时日志，完成后检查自动创建的 PR。
 
-如果任务失败，先移除再重新添加 `codex` 标签即可创建一次新的运行。每次运行使用不同分支名，不会覆盖上一次结果。
+如果任务失败，先移除再重新添加 `codex` 标签即可创建一次新的运行。若该 Issue 已有开放的 Codex PR，工作流会留言并跳过，避免重复创建；请在原 PR 上继续 Review。每次新的实现使用不同分支名，不会覆盖上一次结果。
+
+实现和返工失败或取消时会尽力留言附上运行链接，并将看板恢复到 `In review` 等待人工处理；runner 强制离线时收尾步骤可能无法执行。返工没有产生改动时也恢复 `In review`。Review 使用 `queue: max` 保留最多 100 个等待任务，执行前重新查询 PR 是否仍打开、Review 是否仍为 Request changes；推送前再次检查 PR 状态。
 
 ## 安全边界
 

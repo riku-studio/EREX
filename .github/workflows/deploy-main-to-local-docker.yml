@@ -7,6 +7,8 @@ on:
       - backend/**
       - frontend/**
       - infra/docker-compose.yml
+      - scripts/deploy-local.sh
+      - .github/workflows/deploy-main-to-local-docker.yml
   workflow_dispatch:
 
 concurrency:
@@ -21,13 +23,15 @@ jobs:
       contents: read
     env:
       COMPOSE_PROJECT_NAME: infra
-      EREX_ENV_FILE: ${{ vars.EREX_ENV_FILE }}
+      DEPLOY_ROOT: /home/judgelight/share/projects/EREX
+      DEPLOY_SHA: ${{ github.sha }}
 
     steps:
       - name: Check out main
         uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Verify local deployment prerequisites
@@ -38,33 +42,23 @@ jobs:
           command -v curl
           docker info >/dev/null
 
-          if [[ -z "$EREX_ENV_FILE" || "$EREX_ENV_FILE" != /* ]]; then
-            printf '%s\n' 'Set repository variable EREX_ENV_FILE to an absolute path readable by the runner.' >&2
-            exit 1
-          fi
-          test -r "$EREX_ENV_FILE"
+          test "$GITHUB_REF" = refs/heads/main
+          test -r "$DEPLOY_ROOT/.env"
           test -r /srv/secrets/litellm.env
           docker network inspect shared_network >/dev/null
           docker network inspect ollama_default >/dev/null
 
-      - name: Link the local environment file
+      - name: Deploy in the local project
         shell: bash
-        run: ln -s "$EREX_ENV_FILE" "$GITHUB_WORKSPACE/.env"
-
-      - name: Validate the Compose configuration
-        shell: bash
-        run: docker compose -f infra/docker-compose.yml config --quiet
-
-      - name: Rebuild and apply containers
-        shell: bash
-        run: docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
+        run: bash scripts/deploy-local.sh
 
       - name: Verify the deployed application
         shell: bash
         run: |
           set -euo pipefail
           for attempt in {1..12}; do
-            if curl --fail --silent --show-error http://127.0.0.1:8002/health; then
+            if curl --fail --silent --show-error --connect-timeout 3 --max-time 10 http://127.0.0.1:8002/health \
+              && curl --fail --silent --show-error --connect-timeout 3 --max-time 10 --output /dev/null http://127.0.0.1:8002/; then
               printf '\nDeployment health check passed.\n'
               exit 0
             fi
@@ -77,14 +71,7 @@ jobs:
       - name: Show container diagnostics on failure
         if: failure()
         shell: bash
+        working-directory: /home/judgelight/share/projects/EREX/infra
         run: |
-          docker compose -f infra/docker-compose.yml ps || true
-          docker compose -f infra/docker-compose.yml logs --no-color --tail=200 || true
-
-      - name: Remove the environment-file link
-        if: always()
-        shell: bash
-        run: |
-          if [[ -L "$GITHUB_WORKSPACE/.env" ]]; then
-            unlink "$GITHUB_WORKSPACE/.env"
-          fi
+          docker compose --env-file ../.env ps || true
+          docker compose --env-file ../.env logs --no-color --tail=200 || true

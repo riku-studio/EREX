@@ -9,15 +9,47 @@ on:
 concurrency:
   group: codex-pr-${{ github.event.pull_request.number }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
-  revise:
+  check_review:
     if: >-
       github.event_name == 'pull_request_review' &&
       github.event.review.state == 'changes_requested' &&
       startsWith(github.event.pull_request.head.ref, 'codex/issue-') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - name: Check the current PR and review state
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_ID: ${{ github.event.review.id }}
+        run: |
+          set -euo pipefail
+          pr="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+          review="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews/$REVIEW_ID")"
+          reviewer="$(jq -r '.user.login' <<< "$review")"
+          reviews="$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews?per_page=100")"
+          latest_state="$(jq -r --arg reviewer "$reviewer" \
+            '[.[][] | select(.user.login == $reviewer) | select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] | sort_by(.id) | last | .state // ""' <<< "$reviews")"
+          if jq -e '.state == "open"' <<< "$pr" >/dev/null \
+            && jq -e '.state == "CHANGES_REQUESTED"' <<< "$review" >/dev/null \
+            && [[ "$latest_state" == CHANGES_REQUESTED ]]; then
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  revise:
+    needs: check_review
+    if: needs.check_review.outputs.proceed == 'true'
     runs-on: [self-hosted, linux, codex-local]
     timeout-minutes: 60
     permissions:
@@ -29,7 +61,6 @@ jobs:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_URL: ${{ github.event.pull_request.html_url }}
-      REVIEW_FEEDBACK_FILE: ${{ runner.temp }}/codex-review-feedback.md
       PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
       PROJECT_OWNER: ${{ vars.PROJECT_OWNER || github.repository_owner }}
 
@@ -90,6 +121,7 @@ jobs:
       - name: Collect the requested changes
         shell: bash
         env:
+          REVIEW_FEEDBACK_FILE: ${{ runner.temp }}/codex-review-feedback.md
           GH_TOKEN: ${{ github.token }}
           REVIEW_ID: ${{ github.event.review.id }}
           REVIEWER: ${{ github.event.review.user.login }}
@@ -110,6 +142,7 @@ jobs:
         id: codex
         shell: bash
         env:
+          REVIEW_FEEDBACK_FILE: ${{ runner.temp }}/codex-review-feedback.md
           THREAD_ID: ${{ steps.context.outputs.thread_id }}
         run: |
           trusted_script="${RUNNER_TEMP}/revise-codex-pr.sh"
@@ -124,6 +157,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if [[ "$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq .state)" != open ]]; then
+            printf 'PR closed while Codex was working; refusing to push.\n' >&2
+            exit 1
+          fi
           git config user.name "codex-local[bot]"
           git config user.email "codex-local[bot]@users.noreply.github.com"
           git add -A
@@ -150,7 +187,7 @@ jobs:
           gh pr comment "$PR_NUMBER" --body-file "$body"
 
       - name: Mark the Issue and PR as in review again
-        if: steps.codex.outputs.changed == 'true'
+        if: steps.codex.outputs.changed == 'true' || steps.codex.outputs.changed == 'false'
         continue-on-error: true
         shell: bash
         env:
@@ -185,6 +222,28 @@ jobs:
           git clean -ffdx
           git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
           git branch -D "$CODEX_BRANCH" >/dev/null 2>&1 || true
+
+      - name: Report failure or cancellation
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$RUNNER_TEMP/codex-review-failure.md"
+          printf 'Codex 返工失败或被取消，请人工检查。会话不存在时需恢复 runner 的原会话存储，或人工处理此 PR。\n\n运行记录：%s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$body"
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+
+      - name: Return a failed revision to review
+        if: (failure() || cancelled()) && steps.context.outputs.issue_url != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          ISSUE_URL: ${{ steps.context.outputs.issue_url }}
+        run: |
+          script="$RUNNER_TEMP/failed-review-status.sh"
+          git show "origin/${DEFAULT_BRANCH}:scripts/sync-project-status.sh" > "$script"
+          bash "$script" "$ISSUE_URL" "In review"
+          bash "$script" "$PR_URL" "In review"
 
   mark_done:
     if: >-

@@ -7,10 +7,44 @@ on:
 concurrency:
   group: codex-issue-${{ github.event.issue.number }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
-  implement:
+  check_issue:
     if: github.event.label.name == 'codex'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - name: Skip closed Issues and existing task PRs
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          issue="$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER")"
+          if ! jq -e '.state == "open" and any(.labels[]; .name == "codex")' <<< "$issue" >/dev/null; then
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          existing="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+            --jq ".[] | select(.head.repo.full_name == \"$GITHUB_REPOSITORY\") | select(.head.ref | startswith(\"codex/issue-$ISSUE_NUMBER-\")) | .html_url")"
+          if [[ -n "$existing" ]]; then
+            body="$RUNNER_TEMP/existing-pr.md"
+            printf '此 Issue 已有开放的 Codex PR，本次不重复执行：\n\n%s\n' "$existing" > "$body"
+            gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            echo 'proceed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'proceed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+  implement:
+    needs: check_issue
+    if: needs.check_issue.outputs.proceed == 'true'
     runs-on: [self-hosted, linux, codex-local]
     timeout-minutes: 60
     env:
@@ -144,3 +178,23 @@ jobs:
           git clean -ffdx
           git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
           git branch -D "$CODEX_BRANCH" >/dev/null 2>&1 || true
+
+      - name: Report failure or cancellation
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$RUNNER_TEMP/codex-failure.md"
+          printf 'Codex 自动实现失败或被取消，请人工检查后重新添加 codex 标签重试。\n\n运行记录：%s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$body"
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+
+      - name: Return a failed Issue to review
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          script="$RUNNER_TEMP/failed-issue-status.sh"
+          git show "origin/${DEFAULT_BRANCH}:scripts/sync-project-status.sh" > "$script"
+          bash "$script" "$ISSUE_URL" "In review"
