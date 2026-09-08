@@ -1,6 +1,8 @@
 # GitHub Issue 驱动本地 Codex
 
-本仓库使用 GitHub self-hosted runner，把带有 `codex` 标签的 Issue 交给本机已登录的 Codex CLI。工作流先创建本地任务分支，再让 Codex 修改并验证代码；有改动时才推送分支和创建 Pull Request。它不会直接更新默认分支。
+本仓库使用 GitHub self-hosted runner，仅把 GitHub 账号 `judgelight` 创建且带有 `codex` 标签的 Issue 交给本机已登录的 Codex CLI。工作流先创建本地任务分支，再让 Codex 修改并验证代码；有改动时才推送分支和创建 Pull Request。它不会直接更新默认分支。
+
+公开仓库的其他用户仍可提交 Issue，但即使被添加 `codex` 标签，也会在 Job 条件处跳过，不派发本地 Codex 任务。检查 Job 还会通过 API 再次确认作者、Issue 状态和标签。首次测试需要先将 workflow 推送到默认分支，再由 `judgelight` 创建 Issue 并添加 `codex` 标签；工作流上线前已添加的标签需移除后重新添加。
 
 ## 为什么使用 Codex CLI
 
