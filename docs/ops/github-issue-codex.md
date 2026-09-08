@@ -72,6 +72,8 @@ PR Review 事件是 Agent 行为的触发源，Project Status 是同步后的流
 
 同步脚本会把对应 Issue 和 PR 自动加入 Project，再更新 `Status` 单选字段。状态名匹配不区分大小写，但字段名必须为 `Status`。
 
+同步通过 `gh api` 直接调用 REST/GraphQL：明确识别所有者类型、分页读取字段、添加或获取现有条目并更新状态，避免 `gh project` 将认证错误隐藏为 `unknown owner type`。失败时保留 GitHub API 的错误信息，并在 Actions 注解和运行摘要中提示；主任务成功不代表看板同步成功。不要启用会输出认证请求头的调试日志。
+
 ## 流程图
 
 ```mermaid
