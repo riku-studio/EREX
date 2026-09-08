@@ -13,6 +13,9 @@ jobs:
     if: github.event.label.name == 'codex'
     runs-on: [self-hosted, linux, codex-local]
     timeout-minutes: 60
+    env:
+      CODEX_BRANCH: codex/issue-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
     permissions:
       contents: write
       issues: write
@@ -35,6 +38,12 @@ jobs:
           command -v jq
           codex login status
 
+      - name: Create the local task branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git switch -c "$CODEX_BRANCH"
+
       - name: Let local Codex implement the issue
         id: codex
         shell: bash
@@ -49,21 +58,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           CODEX_FINAL_MESSAGE_FILE: ${{ runner.temp }}/codex-final-message.md
         run: |
           set -euo pipefail
 
-          branch="codex/issue-${ISSUE_NUMBER}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git config user.name "codex-local[bot]"
           git config user.email "codex-local[bot]@users.noreply.github.com"
-          git switch -c "$branch"
           git add -A
           git commit -m "fix: resolve issue #${ISSUE_NUMBER}"
 
           auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
-            push origin "HEAD:refs/heads/${branch}"
+            push origin "HEAD:refs/heads/${CODEX_BRANCH}"
 
           pr_body="${RUNNER_TEMP}/codex-pr-body.md"
           {
@@ -79,7 +85,7 @@ jobs:
 
           pr_url="$(gh pr create \
             --base "$DEFAULT_BRANCH" \
-            --head "$branch" \
+            --head "$CODEX_BRANCH" \
             --title "fix: resolve issue #${ISSUE_NUMBER}" \
             --body-file "$pr_body")"
           gh issue comment "$ISSUE_NUMBER" --body "本地 Codex 已创建 PR：${pr_url}"
@@ -99,3 +105,13 @@ jobs:
             sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
           } > "$body"
           gh issue comment "$ISSUE_NUMBER" --body-file "$body"
+
+      - name: Restore the runner workspace
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard
+          git clean -ffdx
+          git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
+          git branch -D "$CODEX_BRANCH" >/dev/null 2>&1 || true

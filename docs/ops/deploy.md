@@ -26,6 +26,10 @@
 - 部署：在服务器上准备 `.env`，执行 `docker compose -f infra/docker-compose.yml up -d` 或专用 prod compose；仅暴露前端端口，由前端或独立网关反向代理 backend。
 - 日志：全部输出 stdout/stderr，可接入 Loki/ELK；无本地日志文件。
 
+## GitHub 合并后自动应用
+
+仓库的 `.github/workflows/deploy-main-to-local-docker.yml` 会在容器相关改动合并到 `main` 后，由 `codex-local` self-hosted runner 重建并应用 Compose 服务。首次启用前需配置本机环境文件路径和 Docker 权限，完整流程、安全边界及 Mermaid 图见 [`github-issue-codex.md`](github-issue-codex.md#合并后应用到本地-docker)。
+
 ## 配置约定
 - 所有服务依赖根层 `.env`；敏感值不提交版本库。
 - 端口策略：对外只开放前端；backend/db 通过容器网络访问。

@@ -1,6 +1,6 @@
 # GitHub Issue 驱动本地 Codex
 
-本仓库使用 GitHub self-hosted runner，把带有 `codex` 标签的 Issue 交给本机已登录的 Codex CLI。Codex 修改并验证代码后，工作流会创建独立分支和 Pull Request；它不会直接更新默认分支。
+本仓库使用 GitHub self-hosted runner，把带有 `codex` 标签的 Issue 交给本机已登录的 Codex CLI。工作流先创建本地任务分支，再让 Codex 修改并验证代码；有改动时才推送分支和创建 Pull Request。它不会直接更新默认分支。
 
 ## 为什么使用 Codex CLI
 
@@ -17,9 +17,128 @@ OpenAI 也提供 [`openai/codex-action`](https://learn.chatgpt.com/docs/github-a
 1. 用户创建描述清楚的 GitHub Issue。
 2. 有标签权限的维护者审查内容，并添加 `codex` 标签。
 3. GitHub 将任务派发给带有 `codex-local` 标签的 Linux self-hosted runner。
-4. runner 执行 `scripts/run-codex-issue.sh`，由本地 `codex exec` 修改工作区并运行测试。
-5. 工作流拒绝发布对 `.github/workflows`、`.github/actions`、`.gitmodules` 或 Codex 执行脚本本身的改动，也拒绝 Codex 自行创建提交。
-6. 有代码改动时创建分支和 PR；没有改动时在 Issue 留下 Codex 的说明。
+4. 工作流从默认分支创建一个仅存在于 runner 工作区的 `codex/issue-...` 任务分支。
+5. runner 执行 `scripts/run-codex-issue.sh`，由本地 `codex exec` 判断是否需要修改；需要时修改代码并运行测试。
+6. 工作流拒绝发布对 `.github/workflows`、`.github/actions`、`.gitmodules` 或 Codex 执行脚本本身的改动，也拒绝 Codex 自行创建提交。
+7. 有代码改动时提交并推送任务分支，然后创建 PR；没有改动时不推送分支，只在 Issue 留下 Codex 的说明。
+8. Job 结束时丢弃 runner 工作区中的临时内容，恢复到远程默认分支并删除本地任务分支；已经推送的远程 PR 分支不受影响。
+
+## 分支与 Review 生命周期
+
+### Codex 判断不需要修改
+
+不创建 commit、不推送远程分支，也不创建 PR。工作流把 Codex 的原因写入 Issue，随后清理 runner 工作区并恢复到默认分支。
+
+### Codex 产生改动
+
+工作流统一执行 `git add`、创建 Conventional Commit、推送任务分支并创建 PR。Codex 本身接触不到发布令牌，也不负责 Git 发布操作。
+
+### Review 通过
+
+当前设计刻意不自动合并。审核者在 GitHub 上确认测试和改动后手动合并 PR；PR 正文中的 `Closes #<编号>` 会在合并后自动关闭对应 Issue。建议在仓库设置中启用合并后自动删除 head branch。若合并内容涉及后端、前端或 Compose 文件，`main` 的 push 事件随后会触发本地 Docker 部署工作流。
+
+### Review 不通过
+
+审核者使用 `Request changes` 并写明问题，PR 保持打开。当前工作流不会因为 Review 评论自动再次调用 Codex，避免不可信评论触发本地执行或形成无限修改循环。可以由维护者手动修订该 PR；若后续需要自动修订，应另建一个以维护者标签或手动派发为入口的受控 workflow。
+
+Runner 不会等待 PR 合并或 Issue 关闭才恢复：每次 Job 结束时都会立即回到干净的默认分支。这个清理只发生在 Actions 自己的 `_work` checkout 中，不会操作开发者日常使用的另一个本地仓库目录。
+
+## 流程图
+
+```mermaid
+flowchart TD
+    A["创建 GitHub Issue"] --> B["维护者审查并添加 codex 标签"]
+    B --> C["GitHub 派发到 codex-local Runner"]
+    C --> D["Checkout 默认分支"]
+    D --> E["Workflow 创建本地任务分支"]
+    E --> F["Codex 分析 Issue、修改代码并测试"]
+    F --> G{"工作区有改动吗？"}
+    G -- "没有" --> H["在 Issue 说明无需修改"]
+    H --> I["清理工作区并恢复默认分支"]
+    G -- "有" --> J{"安全检查通过吗？"}
+    J -- "否" --> K["Workflow 失败并保留 Actions 日志"]
+    K --> I
+    J -- "是" --> L["Workflow commit、push 并创建 PR"]
+    L --> M{"人工 Review"}
+    M -- "Request changes" --> N["PR 保持打开，人工修订或受控重试"]
+    N --> M
+    M -- "Approve" --> O["人工合并 PR 到 main"]
+    O --> P["自动关闭 Issue"]
+    O --> Q{"是否改动容器相关路径？"}
+    Q -- "否" --> R["不触发部署"]
+    Q -- "是" --> S["本地 Runner 重建并应用 Compose 服务"]
+    S --> T{"健康检查通过吗？"}
+    T -- "是" --> U["部署完成"]
+    T -- "否" --> V["部署失败并输出容器诊断"]
+    L --> I
+```
+
+## 时序图
+
+```mermaid
+sequenceDiagram
+    actor User as Issue 提交者
+    actor Maintainer as 维护者
+    participant GitHub
+    participant Runner as 本地 Runner
+    participant Codex as 本地 Codex CLI
+    participant Docker as Docker Compose
+
+    User->>GitHub: 创建 Issue
+    Maintainer->>GitHub: 审查并添加 codex 标签
+    GitHub->>Runner: 派发 Issue workflow
+    Runner->>Runner: Checkout main 并创建本地任务分支
+    Runner->>Codex: 传入受控 Prompt 和 Issue 内容
+    Codex->>Codex: 分析、修改、编写测试并验证
+    Codex-->>Runner: 返回执行摘要和工作区改动
+
+    alt 没有代码改动
+        Runner->>GitHub: 在 Issue 说明无需修改
+        Runner->>Runner: 清理工作区并恢复 main
+    else 有代码改动且安全检查通过
+        Runner->>GitHub: Commit、push 并创建 PR
+        Runner->>Runner: 清理工作区并恢复 main
+        Maintainer->>GitHub: Review PR
+        alt Review 不通过
+            GitHub-->>Maintainer: PR 保持打开并记录修改意见
+            Maintainer->>GitHub: 人工修订或启动受控重试
+        else Review 通过
+            Maintainer->>GitHub: 合并 PR
+            GitHub-->>User: 通过 Closes 语句关闭 Issue
+            opt 改动 backend、frontend 或 Compose
+                GitHub->>Runner: 派发 main 部署 workflow
+                Runner->>Docker: 重新构建并应用服务
+                Docker-->>Runner: 容器状态
+                Runner->>Docker: 请求 /health
+                alt 健康检查通过
+                    Runner-->>GitHub: 部署成功
+                else 健康检查失败
+                    Runner->>Docker: 收集 ps 和最近日志
+                    Runner-->>GitHub: 部署失败
+                end
+            end
+        end
+    end
+```
+
+## 合并后应用到本地 Docker
+
+`.github/workflows/deploy-main-to-local-docker.yml` 独立处理部署。它只在以下情况运行：
+
+- `main` 中的 `backend/**`、`frontend/**` 或 `infra/docker-compose.yml` 发生变化；
+- 维护者在 Actions 页面手动执行 `workflow_dispatch`。
+
+部署工作流使用固定的 Compose project 名 `infra`，以匹配当前 Compose 项目并更新已有容器。它执行配置校验、`docker compose up -d --build --remove-orphans`，然后通过 `http://127.0.0.1:8002/health` 验证前端和后端链路。失败时输出容器状态和最近 200 行日志；当前不自动回滚。
+
+在 GitHub 仓库 `Settings → Secrets and variables → Actions → Variables` 中创建变量：
+
+```text
+EREX_ENV_FILE=/home/judgelight/share/projects/EREX/.env
+```
+
+变量只保存本机文件路径，不保存 `.env` 内容。Runner 服务用户必须能读取该文件、访问 `/srv/secrets/litellm.env`、操作 Docker daemon，并且本机必须已经存在 `shared_network` 和 `ollama_default` 两个外部网络。部署时工作流在临时 checkout 中创建 `.env` 符号链接，结束后立即删除。
+
+> 如果当前运行的 Compose project 名不是 `infra`，必须在部署前把 workflow 中的 `COMPOSE_PROJECT_NAME` 调整为实际名称，否则可能创建第二套容器而不是更新现有容器。可用 `docker compose -f infra/docker-compose.yml ls` 或容器的 `com.docker.compose.project` 标签确认。
 
 ## 一次性配置
 
