@@ -1,0 +1,219 @@
+name: Codex PR lifecycle
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [closed]
+
+concurrency:
+  group: codex-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  revise:
+    if: >-
+      github.event_name == 'pull_request_review' &&
+      github.event.review.state == 'changes_requested' &&
+      startsWith(github.event.pull_request.head.ref, 'codex/issue-') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)
+    runs-on: [self-hosted, linux, codex-local]
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      CODEX_BRANCH: ${{ github.event.pull_request.head.ref }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      REVIEW_FEEDBACK_FILE: ${{ runner.temp }}/codex-review-feedback.md
+      PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+      PROJECT_OWNER: ${{ vars.PROJECT_OWNER || github.repository_owner }}
+
+    steps:
+      - name: Check out the Codex PR branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify local tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v codex
+          command -v gh
+          command -v jq
+          codex login status
+
+      - name: Resolve the Codex session and linked Issue
+        id: context
+        shell: bash
+        run: |
+          set -euo pipefail
+          thread_id="$(
+            jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" \
+              | sed -n 's/^<!-- codex-thread-id: \([0-9a-fA-F-]\{36\}\) -->$/\1/p' \
+              | sed -n '1p'
+          )"
+          if [[ ! "$thread_id" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            printf 'The PR does not contain a valid Codex thread ID.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$CODEX_BRANCH" =~ ^codex/issue-([0-9]+)- ]]; then
+            printf 'Unable to resolve the linked Issue from branch: %s\n' "$CODEX_BRANCH" >&2
+            exit 1
+          fi
+          issue_number="${BASH_REMATCH[1]}"
+          printf 'thread_id=%s\n' "$thread_id" >> "$GITHUB_OUTPUT"
+          printf 'issue_number=%s\n' "$issue_number" >> "$GITHUB_OUTPUT"
+          printf 'issue_url=https://github.com/%s/issues/%s\n' \
+            "$GITHUB_REPOSITORY" "$issue_number" >> "$GITHUB_OUTPUT"
+
+      - name: Mark the Issue and PR as in progress
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          ISSUE_URL: ${{ steps.context.outputs.issue_url }}
+        run: |
+          trusted_script="${RUNNER_TEMP}/sync-project-status.sh"
+          git show "origin/${DEFAULT_BRANCH}:scripts/sync-project-status.sh" > "$trusted_script"
+          chmod +x "$trusted_script"
+          "$trusted_script" "$ISSUE_URL" "In progress"
+          "$trusted_script" "$PR_URL" "In progress"
+
+      - name: Collect the requested changes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_ID: ${{ github.event.review.id }}
+          REVIEWER: ${{ github.event.review.user.login }}
+        run: |
+          set -euo pipefail
+          {
+            printf '# Review requesting changes\n\n'
+            printf 'Reviewer: @%s\n\n' "$REVIEWER"
+            printf '## Overall review\n\n'
+            jq -r '.review.body // "(No overall review message.)"' "$GITHUB_EVENT_PATH"
+            printf '\n## Inline comments\n\n'
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews/${REVIEW_ID}/comments" \
+              --jq '.[] | "- `" + (.path // "unknown") + ":" + ((.line // .original_line // 0) | tostring) + "` — " + (.body // "")'
+          } > "$REVIEW_FEEDBACK_FILE"
+
+      - name: Resume Codex and address the review
+        id: codex
+        shell: bash
+        env:
+          THREAD_ID: ${{ steps.context.outputs.thread_id }}
+        run: |
+          trusted_script="${RUNNER_TEMP}/revise-codex-pr.sh"
+          git show "origin/${DEFAULT_BRANCH}:scripts/revise-codex-pr.sh" > "$trusted_script"
+          chmod +x "$trusted_script"
+          "$trusted_script"
+
+      - name: Commit and push the revision
+        if: steps.codex.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "codex-local[bot]"
+          git config user.email "codex-local[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: address review for PR #${PR_NUMBER}"
+
+          auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
+            push origin "HEAD:refs/heads/${CODEX_BRANCH}"
+
+      - name: Comment on the revised PR
+        if: steps.codex.outputs.changed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODEX_FINAL_MESSAGE_FILE: ${{ runner.temp }}/codex-revision-final-message.md
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/codex-revision-comment.md"
+          {
+            printf '## Codex Review 修订摘要\n\n'
+            sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
+            printf '\n\n已推送新的修订提交，请重新 Review。\n'
+          } > "$body"
+          gh pr comment "$PR_NUMBER" --body-file "$body"
+
+      - name: Mark the Issue and PR as in review again
+        if: steps.codex.outputs.changed == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          ISSUE_URL: ${{ steps.context.outputs.issue_url }}
+        run: |
+          trusted_script="${RUNNER_TEMP}/sync-project-status.sh"
+          "$trusted_script" "$ISSUE_URL" "In review"
+          "$trusted_script" "$PR_URL" "In review"
+
+      - name: Report that Codex made no revision
+        if: steps.codex.outputs.changed == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CODEX_FINAL_MESSAGE_FILE: ${{ runner.temp }}/codex-revision-final-message.md
+        run: |
+          set -euo pipefail
+          body="${RUNNER_TEMP}/codex-no-revision-comment.md"
+          {
+            printf 'Codex 已处理 Request changes，但没有产生新的代码改动。\n\n'
+            sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
+          } > "$body"
+          gh pr comment "$PR_NUMBER" --body-file "$body"
+
+      - name: Restore the runner workspace
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard
+          git clean -ffdx
+          git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
+          git branch -D "$CODEX_BRANCH" >/dev/null 2>&1 || true
+
+  mark_done:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'codex/issue-')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CODEX_BRANCH: ${{ github.event.pull_request.head.ref }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
+      PROJECT_OWNER: ${{ vars.PROJECT_OWNER || github.repository_owner }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mark the merged Issue and PR as done
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$CODEX_BRANCH" =~ ^codex/issue-([0-9]+)- ]]; then
+            printf 'Unable to resolve the linked Issue from branch: %s\n' "$CODEX_BRANCH" >&2
+            exit 1
+          fi
+          issue_url="https://github.com/${GITHUB_REPOSITORY}/issues/${BASH_REMATCH[1]}"
+          scripts/sync-project-status.sh "$issue_url" "Done"
+          scripts/sync-project-status.sh "$PR_URL" "Done"
