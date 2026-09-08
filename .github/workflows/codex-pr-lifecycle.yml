@@ -167,6 +167,7 @@ jobs:
           git commit -m "fix: address review for PR #${PR_NUMBER}"
 
           auth_header="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          printf '::add-mask::%s\n' "$auth_header"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic ${auth_header}" \
             push origin "HEAD:refs/heads/${CODEX_BRANCH}"
 
@@ -180,9 +181,9 @@ jobs:
           set -euo pipefail
           body="${RUNNER_TEMP}/codex-revision-comment.md"
           {
-            printf '## Codex Review 修订摘要\n\n'
+            printf '## Codex review revision summary\n\n'
             sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
-            printf '\n\n已推送新的修订提交，请重新 Review。\n'
+            printf '\n\nRevision commits have been pushed. Please review the updated PR.\n'
           } > "$body"
           gh pr comment "$PR_NUMBER" --body-file "$body"
 
@@ -208,7 +209,7 @@ jobs:
           set -euo pipefail
           body="${RUNNER_TEMP}/codex-no-revision-comment.md"
           {
-            printf 'Codex 已处理 Request changes，但没有产生新的代码改动。\n\n'
+            printf 'Codex processed the requested changes without making additional code changes.\n\n'
             sed -n '1,200p' "$CODEX_FINAL_MESSAGE_FILE"
           } > "$body"
           gh pr comment "$PR_NUMBER" --body-file "$body"
@@ -230,7 +231,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           body="$RUNNER_TEMP/codex-review-failure.md"
-          printf 'Codex 返工失败或被取消，请人工检查。会话不存在时需恢复 runner 的原会话存储，或人工处理此 PR。\n\n运行记录：%s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$body"
+          printf 'Codex revision failed or was cancelled. Please investigate. If the session is missing, restore the original runner session storage or handle this PR manually.\n\nWorkflow run: %s/%s/actions/runs/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$body"
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$body"
 
       - name: Return a failed revision to review

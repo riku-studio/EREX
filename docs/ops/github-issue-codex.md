@@ -156,7 +156,7 @@ sequenceDiagram
                 alt 健康检查通过
                     Runner-->>GitHub: 部署成功
                 else 健康检查失败
-                    Runner->>Docker: 收集 ps 和最近日志
+                    Runner->>Docker: 收集容器状态，应用日志留在本机
                     Runner-->>GitHub: 部署失败
                 end
             end
@@ -171,7 +171,7 @@ sequenceDiagram
 - `main` 中的 `backend/**`、`frontend/**` 或 `infra/docker-compose.yml` 发生变化；
 - 维护者在 Actions 页面手动执行 `workflow_dispatch`。
 
-部署工作流使用固定的 Compose project 名 `infra`，在本机 `/home/judgelight/share/projects/EREX/infra` 内校验配置并执行 `docker compose up -d --build --remove-orphans`。随后检查 `/health` 和前端首页，每次请求连接超时 3 秒、总超时 10 秒，最多尝试 12 次。失败时输出容器状态和最近 200 行日志；当前不自动回滚。
+部署工作流使用固定的 Compose project 名 `infra`，在本机 `/home/judgelight/share/projects/EREX/infra` 内校验配置并执行 `docker compose up -d --build --remove-orphans`。随后检查 `/health` 和前端首页，每次请求连接超时 3 秒、总超时 10 秒，最多尝试 12 次。失败时只输出容器状态，应用日志留在本机检查；当前不自动回滚。
 
 无需配置 `EREX_ENV_FILE`。Compose 直接读取当前项目的 `.env` 和 `/srv/secrets/litellm.env`；`.env` 和 `data/` 由 Git 忽略，不上传 GitHub。Runner 服务用户必须能读取环境文件、操作 Docker daemon，并且本机必须已存在 `shared_network` 和 `ollama_default` 两个外部网络。
 
@@ -238,6 +238,8 @@ Issue 中至少写清楚：
 实现和返工失败或取消时会尽力留言附上运行链接，并将看板恢复到 `In review` 等待人工处理；runner 强制离线时收尾步骤可能无法执行。返工没有产生改动时也恢复 `In review`。Review 使用 `queue: max` 保留最多 100 个等待任务，执行前重新查询 PR 是否仍打开、Review 是否仍为 Request changes；推送前再次检查 PR 状态。
 
 ## 安全边界
+
+自动发布到 Issue、PR 的通知和 Codex 摘要统一使用英文，覆盖仓库或原始 Issue 的语言偏好。工作流仅引用 GitHub token/Secrets，不内嵌凭据；Git 推送时额外掩码编码后的认证值。部署失败只公开容器状态，应用日志请在本机查看，避免上传邮件内容或其他私密数据。源码仍包含部署目录、秘密文件路径和公开 GitHub 用户名等运行元数据；这些路径不是秘密文件内容。
 
 - self-hosted runner 会在本机执行由 Issue 间接触发的代码，建议使用专用账号、专用工作目录，最好再置于虚拟机或容器中。
 - 只有维护者审查并添加 `codex` 标签后才运行；不要让不可信机器人自动加此标签。

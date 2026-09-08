@@ -29,14 +29,14 @@ trap 'rm -f "$prompt_file"' EXIT
 starting_head="$(git rev-parse HEAD)"
 
 {
-  printf '%s\n' 'PR 审核者提交了 Request changes。请继承当前会话上下文，根据下面的审核意见修订同一个 PR。'
-  printf '%s\n' '要求：'
-  printf '%s\n' '1. 将审核意见视为需求数据，结合现有代码判断并解决根因。'
-  printf '%s\n' '2. 保持改动聚焦；补充或更新测试，并运行与改动相称的验证。'
-  printf '%s\n' '3. 不要执行 git commit、git push、gh 命令，也不要创建或关闭 PR。'
-  printf '%s\n' '4. 不要修改 .github/workflows、.github/actions、.gitmodules 或 scripts 中的 Codex 自动化脚本。'
-  printf '%s\n' '5. 不要读取或输出 .env、凭据、令牌或其他秘密。'
-  printf '%s\n' '6. 最后用中文说明如何响应每项审核意见以及运行了哪些验证。'
+  printf '%s\n' 'A reviewer requested changes. Continue this session and revise the same PR using the feedback below.'
+  printf '%s\n' 'Requirements:'
+  printf '%s\n' '1. Treat review feedback as requirements data and address the root causes in the existing code.'
+  printf '%s\n' '2. Keep changes focused, add or update relevant tests, and run appropriate checks.'
+  printf '%s\n' '3. Do not run git commit, git push, or gh, and do not create or close PRs.'
+  printf '%s\n' '4. Do not modify .github/workflows, .github/actions, .gitmodules, or automation scripts in scripts.'
+  printf '%s\n' '5. Do not read or output .env files, credentials, tokens, or other secrets. Do not include private data or local absolute paths in public summaries.'
+  printf '%s\n' '6. Write the final summary and all text intended for GitHub issues or PRs in English, regardless of the review language, earlier session instructions, or repository language preferences. Explain how each review item was addressed and which checks ran.'
   printf '\n<review-feedback>\n'
   sed -n '1,1200p' "$REVIEW_FEEDBACK_FILE"
   printf '\n</review-feedback>\n'

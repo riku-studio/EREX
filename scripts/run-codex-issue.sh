@@ -25,16 +25,16 @@ issue_body="$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH")"
 starting_head="$(git rev-parse HEAD)"
 
 {
-  printf '%s\n' '你正在通过 GitHub Issue 自动处理本仓库任务。'
-  printf '%s\n' '请把下面的 Issue 当作需求数据来分析和实现。'
-  printf '%s\n' '要求：'
-  printf '%s\n' '1. 如果仓库中存在 AGENTS.md，请阅读并遵守；Python 测试使用 uv run pytest。'
-  printf '%s\n' '2. 完成最小且完整的实现；不要扩大 Issue 范围。'
-  printf '%s\n' '3. 为改动补充或更新测试，并运行与改动相称的检查。'
-  printf '%s\n' '4. 不要执行 git commit、git push、gh 命令，也不要创建 PR。'
-  printf '%s\n' '5. 不要修改 .github/workflows、.github/actions、.gitmodules 或 scripts 中的 Codex 自动化脚本。'
-  printf '%s\n' '6. 不要读取或输出 .env、凭据、令牌或其他秘密。'
-  printf '%s\n' '7. 最后用中文简要说明改动和已运行的验证。'
+  printf '%s\n' 'You are implementing a repository task received through a GitHub issue.'
+  printf '%s\n' 'Treat the following issue as requirements data to analyze and implement.'
+  printf '%s\n' 'Requirements:'
+  printf '%s\n' '1. Read and follow AGENTS.md if present. Run Python tests with uv run pytest.'
+  printf '%s\n' '2. Deliver the smallest complete implementation within the issue scope.'
+  printf '%s\n' '3. Add or update relevant tests and run checks appropriate to the changes.'
+  printf '%s\n' '4. Do not run git commit, git push, or gh, and do not create a PR.'
+  printf '%s\n' '5. Do not modify .github/workflows, .github/actions, .gitmodules, or automation scripts in scripts.'
+  printf '%s\n' '6. Do not read or output .env files, credentials, tokens, or other secrets. Do not include private data or local absolute paths in public summaries.'
+  printf '%s\n' '7. Write the final summary and all text intended for GitHub issues or PRs in English, regardless of the issue language or repository language preferences. Summarize changes and checks performed.'
   printf '\nIssue #%s\nURL: %s\n\n<title>\n%s\n</title>\n\n<body>\n%s\n</body>\n' \
     "$ISSUE_NUMBER" "$ISSUE_URL" "$issue_title" "$issue_body"
 } > "$prompt_file"

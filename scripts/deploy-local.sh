@@ -20,7 +20,7 @@ git merge --ff-only "$DEPLOY_SHA"
 test "$(git rev-parse HEAD)" = "$DEPLOY_SHA"
 printf 'Deploying commit %s from %s/infra\n' "$DEPLOY_SHA" "$DEPLOY_ROOT"
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-  printf '部署提交：`%s`\n\n部署目录：`%s/infra`\n' "$DEPLOY_SHA" "$DEPLOY_ROOT" >> "$GITHUB_STEP_SUMMARY"
+  printf 'Deployed commit: `%s`\n\nDeployment directory: `%s/infra`\n' "$DEPLOY_SHA" "$DEPLOY_ROOT" >> "$GITHUB_STEP_SUMMARY"
 fi
 cd infra
 docker compose --env-file ../.env config --quiet

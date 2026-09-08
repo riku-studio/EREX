@@ -74,4 +74,4 @@ jobs:
         working-directory: /home/judgelight/share/projects/EREX/infra
         run: |
           docker compose --env-file ../.env ps || true
-          docker compose --env-file ../.env logs --no-color --tail=200 || true
+          printf 'Inspect application logs locally; container logs are not uploaded because they may contain private data.\n'
