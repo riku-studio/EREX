@@ -254,7 +254,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#ffff00] text-slate-800 font-sans">
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-800 font-sans">
       
       {/* Sidebar Navigation */}
       <aside className="w-full md:w-64 bg-white border-r border-slate-200 flex-shrink-0">
